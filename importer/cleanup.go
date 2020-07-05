@@ -25,6 +25,24 @@ func (i *Importer) Cleanup(minRating int) ([]string, error) {
 			return nil, err
 		}
 
+		if meta.Deleted || meta.Rating <= minRating {
+			save := false
+			if len(meta.Converted) != 0 {
+				save = true
+				meta.Converted = make(map[string]string)
+			}
+			if len(meta.PP3) != 0 {
+				save = true
+				meta.PP3 = make([]string, 0)
+			}
+
+			if save {
+				if err = SaveMeta(f, meta); err != nil {
+					return nil, err
+				}
+			}
+		}
+
 		if meta.Deleted {
 			continue
 		}
