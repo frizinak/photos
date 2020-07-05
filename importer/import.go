@@ -98,15 +98,19 @@ func (i *Importer) Import(checksum bool) error {
 	os.MkdirAll(i.rawDir, 0755)
 
 	exists := func(f *File) bool {
+		p := (NewFile(i.rawDir, f.bytes, f.fn)).Path()
+		s, err := os.Stat(p)
+		if os.IsNotExist(err) {
+			if checksum {
+				i.log.Printf("Would import %s from %s", p, f.Path())
+			}
+			return false
+		}
+
 		if checksum {
 			return false
 		}
 
-		p := (NewFile(i.rawDir, f.bytes, f.fn)).Path()
-		s, err := os.Stat(p)
-		if os.IsNotExist(err) {
-			return false
-		}
 		if s.IsDir() || err != nil {
 			if err == nil {
 				err = fmt.Errorf("file '%s' exists as a directory", p)
@@ -126,6 +130,7 @@ func (i *Importer) Import(checksum bool) error {
 		dest := p.Path()
 
 		if checksum {
+			defer os.Remove(src)
 			existing, err := sum(dest)
 			if os.IsNotExist(err) {
 				return nil
@@ -153,6 +158,7 @@ func (i *Importer) Import(checksum bool) error {
 	defer lock.Unlock()
 	for n, b := range backends {
 		tmpdest := fmt.Sprintf("%s/tmp-%s", i.rawDir, clean(n))
+		os.RemoveAll(tmpdest)
 		os.MkdirAll(tmpdest, 0700)
 		defer os.RemoveAll(tmpdest)
 		ok, err := b.Available()
