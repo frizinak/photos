@@ -64,6 +64,7 @@ func main() {
 	var alwaysYes bool
 	var zero bool
 	var maxWorkers int
+	var noRawPrefix bool
 
 	flag.StringVar(
 		&actions,
@@ -72,7 +73,8 @@ func main() {
 		`comma separated list of actions:
 - import         Import media from connected camera (gphoto2) and any given directory (-source) to the directory specified with -raws
 - show           Show raws (filter with -filter)
-- show-jpegs     Show jpegs (filter with -filter)
+- show-jpegs     Show jpegs (filter with -filter) (see -no-raw)
+- show-links     Show links (filter with -filter) (see -no-raw)
 - update-meta    Rewrite .meta file (filter with -filter)
 - link           Create collection symlinks in the given directory (-collection)
 - previews       Generate simple jpeg previews (used by -actions rate)
@@ -111,6 +113,7 @@ func main() {
 	flag.BoolVar(&alwaysYes, "y", false, "always answer yes")
 	flag.BoolVar(&zero, "0", false, `all stdout output will be separated by a null byte
 e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
+	flag.BoolVar(&noRawPrefix, "no-raw", false, "[show-*] don't prefix output with the corresponding raw file")
 
 	flag.Parse()
 
@@ -302,7 +305,27 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 					return false, err
 				}
 				for jpg := range m.Converted {
-					stdout(filepath.Join(jpegDir, jpg))
+					p := filepath.Join(jpegDir, jpg)
+					if noRawPrefix {
+						stdout(p)
+						continue
+					}
+					stdout(fmt.Sprintf("%s: %s", f.Path(), p))
+				}
+				return true, nil
+			})
+		case "show-links":
+			all(func(f *importer.File) (bool, error) {
+				links, err := imp.FindLinks(f)
+				if err != nil {
+					return false, err
+				}
+				for _, l := range links {
+					if noRawPrefix {
+						stdout(l)
+						continue
+					}
+					stdout(fmt.Sprintf("%s: %s", f.Path(), l))
 				}
 				return true, nil
 			})

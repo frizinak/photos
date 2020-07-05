@@ -14,7 +14,7 @@ type LinkInfo struct {
 	link *File
 }
 
-func (i *Importer) findLinks(f *File) (links []string, err error) {
+func (i *Importer) FindLinks(f *File) (links []string, err error) {
 	links = []string{}
 	err = i.walkLinks(f, func(l string) (bool, error) {
 		links = append(links, l)

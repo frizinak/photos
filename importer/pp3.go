@@ -139,7 +139,7 @@ func (m mtimes) Len() int           { return len(m) }
 
 func (i *Importer) syncMetaAndPP3(f *File) ([]string, error) {
 	metaPath := metaFile(f)
-	links, err := i.findLinks(f)
+	links, err := i.FindLinks(f)
 	if err != nil {
 		return nil, err
 	}
