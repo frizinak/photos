@@ -40,7 +40,11 @@ rawtherapee to use `-actions convert`
 
 - Convert images with a rating > 2 to jpegs
 
-`photos -base my_library -actions convert -sizes 3840,1920,800 -filter normal -gt 2``
+`photos -base my_library -actions convert -sizes 3840,1920,800 -filter normal -gt 2`
+
+- Merge library `two` onto `one`
+
+`rsync -u -l -r -ptgo two/ one`
 
 ## Install
 
