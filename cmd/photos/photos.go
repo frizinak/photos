@@ -66,6 +66,7 @@ func main() {
 	var zero bool
 	var maxWorkers int
 	var noRawPrefix bool
+	var edited bool
 
 	flag.StringVar(
 		&actions,
@@ -82,14 +83,18 @@ func main() {
 - previews       Generate simple jpeg previews (used by -actions rate)
 - rate           Simple opengl window to rate / trash images (filter with -filter)
 - sync-meta      Sync .meta file with .pp3 (file mtime determines which one is the authority)
-- convert        Convert images to jpegs to the given directory (-jpegs) and sizes (-sizes) (filter with -filter)
+- convert        Convert images to jpegs to the given directory (-jpegs) and sizes (-sizes) (filter with -filter and -edited)
 - exec           Run an external command for each file (first non flag and any further arguments, {} is replaced with the filepath)
                  e.g.: photos -base . -actions exec -filter all wc -c {}
+- cleanup        Remove pp3s and jpegs for deleted RAWs 
+                 -filter and -lt are ignored
+				 Images whose rating is not higher than -gt will also have their jpegs deleted.
 `)
 
 	flag.StringVar(&itemFilter, "filter", "normal", "[any] filter (normal / all / deleted / unrated)")
 	flag.IntVar(&ratingGTFilter, "gt", -1, "[any] additional greater than given rating filter")
 	flag.IntVar(&ratingLTFilter, "lt", 6, "[any] additional less than given rating filter")
+	flag.BoolVar(&edited, "edited", false, "[convert] only convert images that have been edited with rawtherapee")
 	flag.BoolVar(&checksum, "sum", false, "[import] dry-run and report non-identical files with duplicate filenames")
 	flag.StringVar(&sizes, "sizes", "1920", "[convert] comma separated list of widths (e.g.: 3840,1920,800)")
 
@@ -368,12 +373,12 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 
 			allCounted(func(f *importer.File, n, total int) (bool, error) {
 				fmt.Fprintf(os.Stderr, "\033[K\rConverting %4d/%-4d", n+1, total)
-				return true, imp.Convert(f, rs)
+				return true, imp.Convert(f, rs, edited)
 			})
 			fmt.Fprintln(os.Stderr)
 		},
 		"cleanup": func() {
-			list, err := imp.Cleanup()
+			list, err := imp.Cleanup(ratingGTFilter)
 			exit(err)
 			if len(list) == 0 {
 				return

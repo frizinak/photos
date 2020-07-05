@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func (i *Importer) Cleanup() ([]string, error) {
+func (i *Importer) Cleanup(minRating int) ([]string, error) {
 	all := make([]*File, 0, 1000)
 	err := i.All(func(f *File) (bool, error) {
 		all = append(all, f)
@@ -29,9 +29,12 @@ func (i *Importer) Cleanup() ([]string, error) {
 			continue
 		}
 
-		for n := range meta.Converted {
-			converted[n] = struct{}{}
+		if meta.Rating > minRating {
+			for n := range meta.Converted {
+				converted[n] = struct{}{}
+			}
 		}
+
 		for _, n := range meta.PP3 {
 			pp3[n] = struct{}{}
 		}

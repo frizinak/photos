@@ -106,7 +106,11 @@ func (i *Importer) pp3Convert(link string, pp3 *ini.File, size int) (string, str
 	return tmppath, hex, err
 }
 
-func (i *Importer) Convert(f *File, sizes []int) error {
+func pp3Edited(pp3 *ini.File) bool {
+	return pp3.Section("Exposure").HasKey("Compensation")
+}
+
+func (i *Importer) Convert(f *File, sizes []int, editedOnly bool) error {
 	links := []string{}
 	pp3s := []*ini.File{}
 	err := i.walkLinks(f, func(link string) (bool, error) {
@@ -116,6 +120,10 @@ func (i *Importer) Convert(f *File, sizes []int) error {
 				return true, nil
 			}
 			return false, err
+		}
+
+		if editedOnly && !pp3Edited(pp3) {
+			return true, nil
 		}
 
 		pp3s = append(pp3s, pp3)
