@@ -229,15 +229,20 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 			}()
 		}
 
+		output := false
 		allCounted(func(f *importer.File, n, total int) (bool, error) {
 			work <- f
+			output = true
 			fmt.Fprintf(os.Stderr, "\033[K\r%4d/%-4d", n+1, total)
 			return true, nil
 		})
 
 		close(work)
 		wg.Wait()
-		fmt.Fprintln(os.Stderr)
+		if output {
+			fmt.Fprintln(os.Stderr)
+		}
+
 	}
 
 	workNoProgress := func(workers int, do func(*importer.File) error) {
@@ -268,24 +273,8 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 		wg.Wait()
 	}
 
-	act := strings.Split(actions, ",")
-	for _, action := range act {
-		filter = func(f *importer.File) bool {
-			meta, err := importer.GetMeta(f)
-			exit(err)
-			if meta.Rating <= ratingGTFilter {
-				return false
-			}
-			if meta.Rating >= ratingLTFilter {
-				return false
-			}
-
-			return _filter(meta, f)
-		}
-
-		action = strings.TrimSpace(action)
-		switch action {
-		case "import":
+	cmds := map[string]func(){
+		"import": func() {
 			l.Println("importing")
 			for _, path := range fsSources {
 				importer.Register(
@@ -296,13 +285,14 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 
 			exit(imp.Import(checksum))
 
-		case "show":
+		},
+		"show": func() {
 			all(func(f *importer.File) (bool, error) {
 				stdout(f.Path())
 				return true, nil
 			})
-
-		case "show-jpegs":
+		},
+		"show-jpegs": func() {
 			all(func(f *importer.File) (bool, error) {
 				m, err := importer.GetMeta(f)
 				if err != nil {
@@ -318,7 +308,8 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 				}
 				return true, nil
 			})
-		case "show-links":
+		},
+		"show-links": func() {
 			all(func(f *importer.File) (bool, error) {
 				links, err := imp.FindLinks(f)
 				if err != nil {
@@ -333,19 +324,19 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 				}
 				return true, nil
 			})
-
-		case "update-meta":
+		},
+		"update-meta": func() {
 			l.Println("updating meta")
 			work(100, func(f *importer.File) error {
 				_, err := importer.MakeMeta(f)
 				return err
 			})
-
-		case "link":
+		},
+		"link": func() {
 			l.Println("linking")
 			exit(imp.Link())
-
-		case "previews":
+		},
+		"previews": func() {
 			l.Println("creating previews")
 			work(-1, func(f *importer.File) error {
 				err := importer.EnsurePreview(f)
@@ -356,17 +347,17 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 
 				return err
 			})
-
-		case "rate":
+		},
+		"rate": func() {
 			exit(rate.Run(l, allList()))
-
-		case "sync-meta":
+		},
+		"sync-meta": func() {
 			l.Println("syncing meta")
 			work(-1, func(f *importer.File) error {
 				return imp.SyncMetaAndPP3(f)
 			})
-
-		case "convert":
+		},
+		"convert": func() {
 			sl := strings.Split(sizes, ",")
 			rs := make([]int, 0, len(sl))
 			for _, s := range sl {
@@ -380,12 +371,12 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 				return true, imp.Convert(f, rs)
 			})
 			fmt.Fprintln(os.Stderr)
-
-		case "cleanup":
+		},
+		"cleanup": func() {
 			list, err := imp.Cleanup()
 			exit(err)
 			if len(list) == 0 {
-				continue
+				return
 			}
 
 			for _, p := range list {
@@ -402,8 +393,8 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 				}
 				fmt.Println("done")
 			}
-
-		case "info":
+		},
+		"info": func() {
 			files := flag.Args()
 			var err error
 			for i := range files {
@@ -501,8 +492,8 @@ Date: %s
 					),
 				)
 			}
-
-		case "exec":
+		},
+		"exec": func() {
 			args := flag.Args()
 			if len(args) == 0 {
 				exit(errors.New("no exec command given"))
@@ -545,8 +536,30 @@ Date: %s
 
 			close(results)
 			<-done
-		default:
-			exit(fmt.Errorf("action '%s' does not exist", action))
+		},
+	}
+
+	act := strings.Split(actions, ",")
+	for _, action := range act {
+		filter = func(f *importer.File) bool {
+			meta, err := importer.GetMeta(f)
+			exit(err)
+			if meta.Rating <= ratingGTFilter {
+				return false
+			}
+			if meta.Rating >= ratingLTFilter {
+				return false
+			}
+
+			return _filter(meta, f)
 		}
+
+		action = strings.TrimSpace(action)
+		if f, ok := cmds[action]; ok {
+			f()
+			continue
+		}
+
+		exit(fmt.Errorf("action '%s' does not exist", action))
 	}
 }

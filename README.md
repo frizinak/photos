@@ -44,7 +44,7 @@ rawtherapee to use `-actions convert`
 
 - Merge library `two` onto `one`
 
-`rsync -u -l -r -ptgo two/ one`
+`rsync -ua two/ one`
 
 ## Install
 
