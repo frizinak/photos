@@ -25,7 +25,7 @@ type Backend interface {
 var (
 	lock             sync.Mutex
 	backends         = map[string]Backend{}
-	alphaRE          = regexp.MustCompile(`[^a-z0-9.\-_]+`)
+	alphaRE          = regexp.MustCompile(`[^A-Za-z0-9.\-_]+`)
 	supportedExtList = map[string]struct{}{
 		".nef":  struct{}{},
 		".dng":  struct{}{},
