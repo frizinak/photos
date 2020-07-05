@@ -339,7 +339,7 @@ e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 		},
 		"update-meta": func() {
 			l.Println("updating meta")
-			work(100, func(f *importer.File) error {
+			work(-1, func(f *importer.File) error {
 				_, err := importer.MakeMeta(f)
 				return err
 			})
