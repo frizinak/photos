@@ -106,6 +106,28 @@ func (i *Importer) pp3Convert(link string, pp3 *ini.File, size int) (string, str
 	return tmppath, hex, err
 }
 
+func (i *Importer) Unedited(f *File) (bool, error) {
+	edited := true
+	err := i.walkLinks(f, func(link string) (bool, error) {
+		pp3, _, err := i.GetPP3(link)
+		if err != nil {
+			if os.IsNotExist(err) {
+				edited = false
+				return false, nil
+			}
+			return false, err
+		}
+		if !pp3Edited(pp3) {
+			edited = false
+			return false, nil
+		}
+
+		return true, nil
+	})
+
+	return !edited, err
+}
+
 func pp3Edited(pp3 *ini.File) bool {
 	return pp3.Section("Exposure").HasKey("Compensation")
 }

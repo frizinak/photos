@@ -91,7 +91,7 @@ func main() {
 				 Images whose rating is not higher than -gt will also have their jpegs deleted.
 `)
 
-	flag.StringVar(&itemFilter, "filter", "normal", "[any] filter (normal / all / deleted / unrated)")
+	flag.StringVar(&itemFilter, "filter", "normal", "[any] filter (normal / all / deleted / unrated / unedited)")
 	flag.IntVar(&ratingGTFilter, "gt", -1, "[any] additional greater than given rating filter")
 	flag.IntVar(&ratingLTFilter, "lt", 6, "[any] additional less than given rating filter")
 	flag.BoolVar(&edited, "edited", false, "[convert] only convert images that have been edited with rawtherapee")
@@ -156,6 +156,9 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 		return false
 	}
 
+	l := log.New(os.Stderr, "", log.LstdFlags)
+	imp := importer.New(l, rawDir, collectionDir, jpegDir)
+
 	switch itemFilter {
 	case "normal":
 		_filter = func(meta meta.Meta, f *importer.File) bool {
@@ -173,12 +176,16 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 		_filter = func(meta meta.Meta, f *importer.File) bool {
 			return !meta.Deleted && (meta.Rating < 1 || meta.Rating > 5)
 		}
+	case "unedited":
+		_filter = func(meta meta.Meta, f *importer.File) bool {
+			b, err := imp.Unedited(f)
+			exit(err)
+			return b && !meta.Deleted
+		}
 	}
 
 	var filter func(f *importer.File) bool
 
-	l := log.New(os.Stderr, "", log.LstdFlags)
-	imp := importer.New(l, rawDir, collectionDir, jpegDir)
 	all := func(it func(f *importer.File) (bool, error)) {
 		exit(
 			imp.All(func(f *importer.File) (bool, error) {
