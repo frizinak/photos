@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/frizinak/photos/importer"
 	"github.com/frizinak/photos/importer/fs"
@@ -75,6 +76,7 @@ func main() {
 - show           Show raws (filter with -filter)
 - show-jpegs     Show jpegs (filter with -filter) (see -no-raw)
 - show-links     Show links (filter with -filter) (see -no-raw)
+- info           Show info for given RAWs
 - update-meta    Rewrite .meta file (filter with -filter)
 - link           Create collection symlinks in the given directory (-collection)
 - previews       Generate simple jpeg previews (used by -actions rate)
@@ -168,18 +170,7 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 		}
 	}
 
-	filter := func(f *importer.File) bool {
-		meta, err := importer.GetMeta(f)
-		exit(err)
-		if meta.Rating <= ratingGTFilter {
-			return false
-		}
-		if meta.Rating >= ratingLTFilter {
-			return false
-		}
-
-		return _filter(meta, f)
-	}
+	var filter func(f *importer.File) bool
 
 	l := log.New(os.Stderr, "", log.LstdFlags)
 	imp := importer.New(l, rawDir, collectionDir, jpegDir)
@@ -279,6 +270,19 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 
 	act := strings.Split(actions, ",")
 	for _, action := range act {
+		filter = func(f *importer.File) bool {
+			meta, err := importer.GetMeta(f)
+			exit(err)
+			if meta.Rating <= ratingGTFilter {
+				return false
+			}
+			if meta.Rating >= ratingLTFilter {
+				return false
+			}
+
+			return _filter(meta, f)
+		}
+
 		action = strings.TrimSpace(action)
 		switch action {
 		case "import":
@@ -397,6 +401,105 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 					exit(os.Remove(p))
 				}
 				fmt.Println("done")
+			}
+
+		case "info":
+			files := flag.Args()
+			var err error
+			for i := range files {
+				files[i], err = importer.Abs(files[i])
+				exit(err)
+			}
+
+			var sem sync.Mutex
+			type m struct {
+				m     meta.Meta
+				links []string
+			}
+			fmap := make(map[string]m)
+
+			filter = func(f *importer.File) bool {
+				return true
+			}
+
+			workNoProgress(100, func(f *importer.File) error {
+				fp, err := importer.Abs(f.Path())
+				if err != nil {
+					return err
+				}
+
+				met, err := importer.GetMeta(f)
+				if err != nil {
+					return err
+				}
+
+				links, err := imp.FindLinks(f)
+				if err != nil {
+					return err
+				}
+				for i := range links {
+					links[i], err = filepath.Abs(links[i])
+					if err != nil {
+						return err
+					}
+				}
+
+				m := m{
+					met,
+					links,
+				}
+				sem.Lock()
+				fmap[fp] = m
+				sem.Unlock()
+				return nil
+			})
+
+			for _, f := range files {
+				info, ok := fmap[f]
+				if !ok {
+					l.Printf("%s does not exist", f)
+					continue
+				}
+
+				links := make([]string, len(info.links))
+				for i := range info.links {
+					links[i] = fmt.Sprintf("Link[]: %s", info.links[i])
+				}
+
+				l := strings.Join(links, "\n")
+				if l == "" {
+					l = "Link[]:"
+				}
+
+				converted := make([]string, 0, len(info.m.Converted))
+				for i := range info.m.Converted {
+					p, err := filepath.Abs(filepath.Join(jpegDir, i))
+					exit(err)
+					converted = append(converted, fmt.Sprintf("Converted[]: %s", p))
+				}
+				c := strings.Join(converted, "\n")
+				if c == "" {
+					c = "Converted[]:"
+				}
+
+				stdout(
+					fmt.Sprintf(`RAW: %s
+Size: %d
+Deleted: %t
+Rank: %d
+Date: %s
+%s
+%s
+`,
+						f,
+						info.m.Size,
+						info.m.Deleted,
+						info.m.Rating,
+						info.m.CreatedTime().Format(time.RFC3339),
+						l,
+						c,
+					),
+				)
 			}
 
 		case "exec":
