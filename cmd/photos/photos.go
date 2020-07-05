@@ -2,11 +2,14 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -60,6 +63,7 @@ func main() {
 	var sizes string
 	var alwaysYes bool
 	var zero bool
+	var maxWorkers int
 
 	flag.StringVar(
 		&actions,
@@ -75,6 +79,8 @@ func main() {
 - rate           Simple opengl window to rate / trash images (filter with -filter)
 - sync-meta      Sync .meta file with .pp3 (file mtime determines which one is the authority)
 - convert        Convert images to jpegs to the given directory (-jpegs) and sizes (-sizes) (filter with -filter)
+- exec           Run an external command for each file (first non flag and any further arguments, {} is replaced with the filepath)
+                 e.g.: photos -base . -actions exec -filter all wc -c {}
 `)
 
 	flag.StringVar(&itemFilter, "filter", "normal", "[any] filter (normal / all / deleted / unrated)")
@@ -86,6 +92,8 @@ func main() {
 	flag.StringVar(&rawDir, "raws", "", "[any] Raw directory")
 	flag.StringVar(&collectionDir, "collection", "", "[any] Collection directory")
 	flag.StringVar(&jpegDir, "jpegs", "", "[convert] JPEG directory")
+
+	flag.IntVar(&maxWorkers, "workers", 100, "[all] maximum amount of threads")
 
 	flag.StringVar(
 		&baseDir,
@@ -212,6 +220,9 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 		if workers < 1 {
 			workers = runtime.NumCPU()
 		}
+		if workers > maxWorkers {
+			workers = maxWorkers
+		}
 		work := make(chan *importer.File, workers)
 		var wg sync.WaitGroup
 		for i := 0; i < workers; i++ {
@@ -233,6 +244,34 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 		close(work)
 		wg.Wait()
 		fmt.Fprintln(os.Stderr)
+	}
+
+	workNoProgress := func(workers int, do func(*importer.File) error) {
+		if workers < 1 {
+			workers = runtime.NumCPU()
+		}
+		if workers > maxWorkers {
+			workers = maxWorkers
+		}
+		work := make(chan *importer.File, workers)
+		var wg sync.WaitGroup
+		for i := 0; i < workers; i++ {
+			wg.Add(1)
+			go func() {
+				for f := range work {
+					exit(do(f))
+				}
+				wg.Done()
+			}()
+		}
+
+		all(func(f *importer.File) (bool, error) {
+			work <- f
+			return true, nil
+		})
+
+		close(work)
+		wg.Wait()
 	}
 
 	act := strings.Split(actions, ",")
@@ -337,6 +376,49 @@ e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
 				fmt.Println("done")
 			}
 
+		case "exec":
+			args := flag.Args()
+			if len(args) == 0 {
+				exit(errors.New("no exec command given"))
+			}
+			bin, err := exec.LookPath(args[0])
+			exit(err)
+
+			type w struct {
+				out, err *bytes.Buffer
+				e        error
+			}
+			results := make(chan w, 50)
+			done := make(chan struct{})
+			go func() {
+				for d := range results {
+					_, err := io.Copy(os.Stdout, d.out)
+					exit(err)
+					_, err = io.Copy(os.Stderr, d.err)
+					exit(err)
+					if d.e != nil {
+						exit(d.e)
+					}
+				}
+				done <- struct{}{}
+			}()
+
+			workNoProgress(100, func(f *importer.File) error {
+				l := make([]string, len(args)-1)
+				for i := 1; i < len(args); i++ {
+					l[i-1] = strings.ReplaceAll(args[i], "{}", f.Path())
+				}
+				cmd := exec.Command(bin, l...)
+				w := w{bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil}
+				cmd.Stdout = w.out
+				cmd.Stderr = w.err
+				w.e = cmd.Run()
+				results <- w
+				return nil
+			})
+
+			close(results)
+			<-done
 		default:
 			exit(fmt.Errorf("action '%s' does not exist", action))
 		}
