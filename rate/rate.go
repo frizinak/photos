@@ -7,7 +7,10 @@ import (
 	"image/draw"
 	_ "image/jpeg"
 	"log"
+	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"unsafe"
 
 	"github.com/frizinak/photos/importer"
@@ -114,21 +117,83 @@ func Run(log *log.Logger, files []*importer.File) error {
 		}
 	}
 
-	print := func(f *importer.File) {
-		fmt.Println()
-		fmt.Printf("%4d/%-4d %s\n", index+1, len(files), f.Filename())
+	termClrRed := "\033[48;5;124m"
+	termClrRedContrast := "\033[38;5;231m"
+	termClrGreen := "\033[48;5;70m"
+	termClrGreenContrast := "\033[38;5;16m"
+	termClrBlue := "\033[48;5;56m"
+	termClrBlueContrast := "\033[38;5;231m"
+	if term := os.Getenv("TERM"); !strings.Contains(term, "256color") {
+		termClrRed = "\033[41m"
+		termClrRedContrast = "\033[37m"
+		termClrGreen = "\033[42m"
+		termClrGreenContrast = ""
+		termClrBlue = "\033[44m"
+		termClrBlueContrast = "\033[37m"
+	}
+
+	print := func(f *importer.File, fn bool) {
+		var met meta.Meta
 		updateMeta(f, func(m *meta.Meta) (bool, error) {
-			fmt.Printf("Deleted: %t\tRating: %d/5\n", m.Deleted, m.Rating)
+			met = *m
 			return false, nil
 		})
+		if fn {
+			fmt.Println()
+			fmt.Printf(
+				"\033[1m%s%s   %d/%d   \033[0m\n%s [%s]\n",
+				termClrBlue,
+				termClrBlueContrast,
+				index+1,
+				len(files),
+				f.Filename(),
+				filepath.Base(importer.NicePath("", f, met)),
+			)
+		}
+
+		delString := fmt.Sprintf("\033[1m%s%s  keep  \033[0m", termClrGreen, termClrGreenContrast)
+		if met.Deleted {
+			delString = fmt.Sprintf("\033[1m%s%s delete \033[0m", termClrRed, termClrRedContrast)
+		}
+
+		color := termClrRed
+		colorContrast := termClrRedContrast
+		if met.Rating > 2 {
+			color = termClrGreen
+			colorContrast = termClrGreenContrast
+		}
+
+		fmt.Printf("%s %s%s %d/5 \033[0m\n", delString, color, colorContrast, met.Rating)
 	}
 
 	type Update struct {
 		Rating  int
 		Deleted int
 	}
+	var auto bool
 
-	print(files[0])
+	usage := func() {
+		fmt.Print(`Usage:
+q            : quit
+f            : toggle fullscreen
+h            : print this
+
+a            : toggle automatically go to next image after deleting or rating
+p            : print filename and meta
+
+d | delete   : delete
+u            : undelete
+
+1-5          : rate 1-5
+0            : remove rating
+
+left | space : next
+right        : previous
+`)
+	}
+	usage()
+
+	print(files[0], true)
 
 	var realWidth, realHeight int
 	onResize := func(wnd *glfw.Window, width, height int) {
@@ -181,6 +246,8 @@ func Run(log *log.Logger, files []*importer.File) error {
 		li := index
 		update := Update{-1, -1}
 		var changed bool
+		var doprint bool
+		var next bool
 
 		switch key {
 		case glfw.KeyLeft:
@@ -188,38 +255,56 @@ func Run(log *log.Logger, files []*importer.File) error {
 		case glfw.KeyRight, glfw.KeySpace:
 			index++
 
+		case glfw.KeyH:
+			usage()
+
+		case glfw.KeyA:
+			auto = !auto
+			enabled := "enabled"
+			if !auto {
+				enabled = "disabled"
+			}
+			fmt.Printf("auto switching images %s\n", enabled)
+
 		case glfw.KeyD, glfw.KeyDelete:
 			update.Deleted = 1
-			index++
+			next = true
 		case glfw.KeyU:
 			update.Deleted = 0
 
+		case glfw.Key0:
+			update.Rating = 0
 		case glfw.Key1:
 			update.Rating = 1
-			index++
+			next = true
 		case glfw.Key2:
 			update.Rating = 2
-			index++
+			next = true
 		case glfw.Key3:
 			update.Rating = 3
-			index++
+			next = true
 		case glfw.Key4:
 			update.Rating = 4
-			index++
+			next = true
 		case glfw.Key5:
 			update.Rating = 5
-			index++
+			next = true
 
 		case glfw.KeyP:
-			changed = true
+			doprint = true
+		}
+
+		if next && auto {
+			index++
 		}
 
 		checkIndex()
-		changed = changed || li != index
+
+		doprint = doprint || li != index
 
 		if update.Rating > -1 || update.Deleted > -1 {
 			changed = true
-			updateMeta(files[index], func(m *meta.Meta) (bool, error) {
+			updateMeta(files[li], func(m *meta.Meta) (bool, error) {
 				if update.Deleted > -1 {
 					m.Deleted = update.Deleted == 1
 				}
@@ -231,7 +316,10 @@ func Run(log *log.Logger, files []*importer.File) error {
 		}
 
 		if changed {
-			print(files[index])
+			print(files[li], false)
+		}
+		if doprint {
+			print(files[index], true)
 		}
 	}
 

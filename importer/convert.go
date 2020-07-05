@@ -141,7 +141,7 @@ func (i *Importer) Convert(f *File, sizes []int) error {
 		}
 		rels := make(map[string]struct{}, len(conv))
 		for _, s := range sizes {
-			base := i.NicePath(i.convDir, f, meta)
+			base := NicePath(i.convDir, f, meta)
 			dir := filepath.Dir(base)
 			fn := filepath.Base(base)
 			ext := filepath.Ext(fn)

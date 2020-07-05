@@ -54,6 +54,9 @@ func (i *Importer) link(link string) (*File, error) {
 func (i *Importer) scanDir(dir string, cb func(path string) (bool, error)) (bool, error) {
 	d, err := os.Open(dir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return true, nil
+		}
 		return true, err
 	}
 	list, err := d.Readdir(-1)
@@ -149,7 +152,7 @@ func Abs(path string) (string, error) {
 	return filepath.Abs(rp)
 }
 
-func (i *Importer) NicePath(dir string, f *File, meta meta.Meta) string {
+func NicePath(dir string, f *File, meta meta.Meta) string {
 	d := meta.CreatedTime()
 	return filepath.Join(
 		dir,
@@ -198,7 +201,7 @@ func (i *Importer) Link() error {
 			return true, nil
 		}
 
-		linkDest := i.NicePath(i.colDir, f, meta)
+		linkDest := NicePath(i.colDir, f, meta)
 		linkDir := filepath.Dir(linkDest)
 		os.MkdirAll(linkDir, 0755)
 		linkDir, err = Abs(linkDir)
