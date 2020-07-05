@@ -119,7 +119,7 @@ func main() {
 
 	flag.BoolVar(&alwaysYes, "y", false, "always answer yes")
 	flag.BoolVar(&zero, "0", false, `all stdout output will be separated by a null byte
-e.g.: photos -base . -0 -actions show-jpegs | xargs -0 feh`)
+e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 	flag.BoolVar(&noRawPrefix, "no-raw", false, "[show-*] don't prefix output with the corresponding raw file")
 
 	flag.Parse()
