@@ -13,6 +13,7 @@ type Type string
 
 const (
 	NEF  Type = "nef"
+	JPEG Type = "jpeg"
 	DNG  Type = "dng"
 	TIFF Type = "tiff"
 )
@@ -26,6 +27,8 @@ func TypeForExt(ext string) (Type, error) {
 		t = DNG
 	case ".tiff":
 		t = TIFF
+	case ".jpg", ".jpeg":
+		t = JPEG
 	}
 
 	if t == "" {
@@ -42,7 +45,7 @@ type JPEGConfig struct {
 	Height  int
 }
 
-func JPEG(r io.Reader, w io.Writer, c JPEGConfig) error {
+func ToJPEG(r io.Reader, w io.Writer, c JPEGConfig) error {
 	args := []string{
 		fmt.Sprintf("%s:-", c.Type),
 	}

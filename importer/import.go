@@ -28,12 +28,14 @@ var (
 	alphaRE          = regexp.MustCompile(`[^A-Za-z0-9.\-_]+`)
 	supportedExtList = map[string]struct{}{
 		".nef":  struct{}{},
+		".jpg":  struct{}{},
 		".dng":  struct{}{},
 		".tiff": struct{}{},
 		".mov":  struct{}{},
 	}
 	pp3ExtList = map[string]struct{}{
 		".nef":  struct{}{},
+		".jpg":  struct{}{},
 		".dng":  struct{}{},
 		".tiff": struct{}{},
 	}

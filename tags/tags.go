@@ -38,7 +38,7 @@ func (t *Tags) Date() time.Time {
 func Parse(path string) *Tags {
 	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
-	case ".nef", ".dng", ".tiff":
+	case ".nef", ".dng", ".tiff", ".jpg":
 		ex, err := ParseExif(path)
 		return &Tags{ex: ex, err: err}
 	default:

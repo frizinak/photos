@@ -42,7 +42,7 @@ func MakePreview(f *File) error {
 		Type:    typ,
 		Height:  1080,
 	}
-	if err := tiff.JPEG(src, dst, c); err != nil {
+	if err := tiff.ToJPEG(src, dst, c); err != nil {
 		return err
 	}
 	return os.Rename(tmp, real)
