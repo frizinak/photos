@@ -2,19 +2,19 @@
 
 ## Dependencies
 
-imagemagick
-gphoto2
-ffmpeg for .MOVs
-rawtherapee to use `-actions convert`
+- imagemagick         (`-actions previews`)
+- gphoto2             (`-actions import`)
+- ffmpeg for .MOVs    (`-actions import`, currently only uses ffprobe for metadata)
+- rawtherapee         (`-actions convert`)
 
 ## What it does
 
 1. Imports images to `-raws`
 2. Symlinks those raws to `-collection` in an opinionated directory hierarchy
 3. At this point you can:
-    - rename and/or move any of those symlink (as long as the symlink stays intact and remains a descendant of `-raws`)
+    - rename and/or move any of those symlink (as long as the symlink stays intact and remains a descendant of `-collection`)
     - review em using the builtin rating application `-actions rate`
-    - edit these raw symlinks in rawtherapee
+    - edit the raws in `-collection` with rawtherapee
 4. Ratings and deleted/trash flag will be synced between all symlinks of a given raw
 5. Convert images to jpegs using the rawtherapee.pp3 sidecar file and store em in `-jpegs` using the same directory hierarchy as the one we/you have created in `-collection`
 
@@ -26,9 +26,13 @@ rawtherapee to use `-actions convert`
 
 `photos -raws <rawDir> -collection <collectionDir> -jpegs <jpegDir>`
 
-- or -
+or 
 
 `photos -base <basedir>`
+
+which defaults to
+
+`photos -raws <basedir>/Originals -collection <basedir>/Collection -jpegs <basedir>/Converted`
 
 ### common usage
 
