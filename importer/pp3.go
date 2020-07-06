@@ -62,6 +62,7 @@ func (i *Importer) PP3ToMeta(link string) error {
 	}
 
 	iptc := pp3.Section("IPTC")
+	m.Tags = nil
 	if k, err := iptc.GetKey("Keywords"); err == nil {
 		_kws := strings.Split(k.String(), ";")
 		kws := make(meta.Tags, 0, len(_kws))
@@ -134,11 +135,9 @@ func (i *Importer) MetaToPP3(link string) error {
 	general.Key("InTrash").SetValue(strconv.FormatBool(meta.Deleted))
 
 	tags := meta.Tags.Unique()
-	if len(tags) != 0 {
-		iptc := pp3.Section("IPTC")
-		t := fmt.Sprintf("%s;", strings.Join(tags, ";"))
-		iptc.Key("Keywords").SetValue(t)
-	}
+	iptc := pp3.Section("IPTC")
+	t := fmt.Sprintf("%s;", strings.Join(tags, ";"))
+	iptc.Key("Keywords").SetValue(t)
 
 	currentTime := time.Now().Local()
 	if err := pp3.SaveTo(pp3Path); err != nil {
