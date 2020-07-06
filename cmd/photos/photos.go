@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -209,7 +210,7 @@ e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 	}
 
 	allList := func() []*importer.File {
-		l := make([]*importer.File, 0, 100)
+		l := make(importer.Files, 0, 100)
 		exit(
 			imp.All(func(f *importer.File) (bool, error) {
 				if !filter(f) {
@@ -219,6 +220,7 @@ e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 				return true, nil
 			}),
 		)
+		sort.Sort(l)
 		return l
 	}
 
