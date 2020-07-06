@@ -90,7 +90,7 @@ func (i *Importer) scanLinks(dir string, cb func(LinkInfo) (bool, error)) error 
 		i.symlinkCache[dir] = make([]LinkInfo, 0)
 		_, err := i.scanDir(dir, func(path string) (bool, error) {
 			fn := filepath.Base(path)
-			if !i.Supported(fn) {
+			if !i.supported(fn) {
 				return true, nil
 			}
 

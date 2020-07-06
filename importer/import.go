@@ -75,13 +75,17 @@ func (i *Importer) ClearCache() {
 	i.symlinkSem.Unlock()
 }
 
-func (i *Importer) Supported(file string) bool {
+func (i *Importer) IsImage(file string) bool {
+	return i.supportedPP3(file)
+}
+
+func (i *Importer) supported(file string) bool {
 	ext := strings.ToLower(filepath.Ext(file))
 	_, ok := supportedExtList[ext]
 	return ok
 }
 
-func (i *Importer) SupportedPP3(file string) bool {
+func (i *Importer) supportedPP3(file string) bool {
 	ext := strings.ToLower(filepath.Ext(file))
 	_, ok := pp3ExtList[ext]
 	return ok
@@ -123,7 +127,7 @@ func (i *Importer) Import(checksum bool) error {
 	}
 
 	add := func(src string, f *File) error {
-		if !i.Supported(f.fn) {
+		if !i.supported(f.fn) {
 			return fmt.Errorf("unsupported extension %s", f.Path())
 		}
 
@@ -208,7 +212,7 @@ func (i *Importer) All(it func(f *File) (bool, error)) error {
 	for err == nil {
 		items, err = d.Readdir(20)
 		for _, f := range items {
-			if !i.Supported(f.Name()) {
+			if !i.supported(f.Name()) {
 				continue
 			}
 			rf := NewFileFromPath(filepath.Join(i.rawDir, f.Name()))

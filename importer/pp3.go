@@ -219,7 +219,7 @@ func (i *Importer) syncMetaAndPP3(f *File) ([]string, error) {
 }
 
 func (i *Importer) SyncMetaAndPP3(f *File) error {
-	if !i.SupportedPP3(f.Path()) {
+	if !i.supportedPP3(f.Path()) {
 		return nil
 	}
 

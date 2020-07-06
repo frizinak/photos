@@ -220,7 +220,6 @@ e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 				return true, nil
 			}),
 		)
-		sort.Sort(l)
 		return l
 	}
 
@@ -247,7 +246,7 @@ e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 		allCounted(func(f *importer.File, n, total int) (bool, error) {
 			work <- f
 			output = true
-			fmt.Fprintf(os.Stderr, "\033[K\r%4d/%-4d", n+1, total)
+			fmt.Fprintf(os.Stderr, "\033[K\r%4d/%-4d ", n+1, total)
 			return true, nil
 		})
 
@@ -363,7 +362,22 @@ e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 			})
 		},
 		"rate": func() {
-			exit(rate.Run(l, allList()))
+			flist := allList()
+			list := make(importer.Files, 0, len(flist))
+			for _, f := range flist {
+				if !imp.IsImage(f.Filename()) {
+					continue
+				}
+				list = append(list, f)
+			}
+			sort.Sort(list)
+
+			if len(list) == 0 {
+				l.Println("no files to rate with given filters")
+				return
+			}
+
+			exit(rate.Run(l, list))
 		},
 		"sync-meta": func() {
 			l.Println("syncing meta")
