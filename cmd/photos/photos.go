@@ -97,7 +97,7 @@ func main() {
 	flag.IntVar(&ratingLTFilter, "lt", 6, "[any] additional less than given rating filter")
 	flag.BoolVar(&edited, "edited", false, "[convert] only convert images that have been edited with rawtherapee")
 	flag.BoolVar(&checksum, "sum", false, "[import] dry-run and report non-identical files with duplicate filenames")
-	flag.StringVar(&sizes, "sizes", "1920", "[convert] comma separated list of widths (e.g.: 3840,1920,800)")
+	flag.StringVar(&sizes, "sizes", "1920", "[convert] comma separated list of sizes (longest image dimension will be scaled to this size) (e.g.: 3840,1920,800)")
 
 	flag.StringVar(&rawDir, "raws", "", "[any] Raw directory")
 	flag.StringVar(&collectionDir, "collection", "", "[any] Collection directory")
