@@ -72,7 +72,7 @@ func main() {
 	flag.StringVar(
 		&actions,
 		"actions",
-		"import,link,sync-meta,link",
+		"",
 		`comma separated list of actions:
 - import         Import media from connected camera (gphoto2) and any given directory (-source) to the directory specified with -raws
 - show           Show raws (filter with -filter)
@@ -87,7 +87,7 @@ func main() {
 - convert        Convert images to jpegs to the given directory (-jpegs) and sizes (-sizes) (filter with -filter and -edited)
 - exec           Run an external command for each file (first non flag and any further arguments, {} is replaced with the filepath)
                  e.g.: photos -base . -actions exec -filter all wc -c {}
-- cleanup        Remove pp3s and jpegs for deleted RAWs 
+- cleanup        Remove pp3s and jpegs for deleted RAWs
                  -filter and -lt are ignored
 				 Images whose rating is not higher than -gt will also have their jpegs deleted.
 `)
@@ -565,6 +565,10 @@ Date: %s
 			close(results)
 			<-done
 		},
+	}
+
+	if actions == "" {
+		exit(errors.New("no actions provided"))
 	}
 
 	act := strings.Split(actions, ",")
