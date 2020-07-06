@@ -7,6 +7,20 @@ import (
 	"time"
 )
 
+type Tags []string
+
+func (t Tags) Unique() Tags {
+	tm := make(map[string]struct{}, len(t))
+	for _, tag := range t {
+		tm[tag] = struct{}{}
+	}
+	nt := make(Tags, 0, len(t))
+	for i := range tm {
+		nt = append(nt, i)
+	}
+	return nt
+}
+
 type Meta struct {
 	Checksum     string
 	Size         int64
@@ -19,6 +33,8 @@ type Meta struct {
 
 	PP3       []string
 	Converted map[string]string
+
+	Tags Tags
 }
 
 func New(size int64, real string, base string) Meta {

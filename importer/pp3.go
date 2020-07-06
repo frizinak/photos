@@ -6,8 +6,10 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/frizinak/photos/meta"
 	"gopkg.in/ini.v1"
 )
 
@@ -32,7 +34,7 @@ func (i *Importer) PP3ToMeta(link string) error {
 		return err
 	}
 
-	meta, err := EnsureMeta(file)
+	m, err := EnsureMeta(file)
 	if err != nil {
 		return err
 	}
@@ -48,7 +50,7 @@ func (i *Importer) PP3ToMeta(link string) error {
 		if err != nil {
 			return err
 		}
-		meta.Deleted = deleted
+		m.Deleted = deleted
 	}
 
 	if k, err := general.GetKey("Rank"); err == nil {
@@ -56,11 +58,25 @@ func (i *Importer) PP3ToMeta(link string) error {
 		if err != nil {
 			return err
 		}
-		meta.Rating = rank
+		m.Rating = rank
+	}
+
+	iptc := pp3.Section("IPTC")
+	if k, err := iptc.GetKey("Keywords"); err == nil {
+		_kws := strings.Split(k.String(), ";")
+		kws := make(meta.Tags, 0, len(_kws))
+		for _, kw := range _kws {
+			kw = strings.TrimSpace(kw)
+			if kw == "" {
+				continue
+			}
+			kws = append(kws, kw)
+		}
+		m.Tags = kws.Unique()
 	}
 
 	currentTime := time.Now().Local()
-	if err := SaveMeta(file, meta); err != nil {
+	if err := SaveMeta(file, m); err != nil {
 		return err
 	}
 
@@ -116,6 +132,13 @@ func (i *Importer) MetaToPP3(link string) error {
 	general := pp3.Section("General")
 	general.Key("Rank").SetValue(strconv.Itoa(meta.Rating))
 	general.Key("InTrash").SetValue(strconv.FormatBool(meta.Deleted))
+
+	tags := meta.Tags.Unique()
+	if len(tags) != 0 {
+		iptc := pp3.Section("IPTC")
+		t := fmt.Sprintf("%s;", strings.Join(tags, ";"))
+		iptc.Key("Keywords").SetValue(t)
+	}
 
 	currentTime := time.Now().Local()
 	if err := pp3.SaveTo(pp3Path); err != nil {

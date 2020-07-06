@@ -68,6 +68,7 @@ func main() {
 	var maxWorkers int
 	var noRawPrefix bool
 	var edited bool
+	var tags flagStrs
 
 	flag.StringVar(
 		&actions,
@@ -95,6 +96,11 @@ func main() {
 	flag.StringVar(&itemFilter, "filter", "normal", "[any] filter (normal / all / deleted / unrated / unedited)")
 	flag.IntVar(&ratingGTFilter, "gt", -1, "[any] additional greater than given rating filter")
 	flag.IntVar(&ratingLTFilter, "lt", 6, "[any] additional less than given rating filter")
+	flag.Var(&tags, "tags", `[any] additional tag filter, comma separated <or> can be specified multiple times <and>
+e.g:
+photo must be tagged: (outside || sunny) && dog
+-tags 'outside,sunny' -tags 'dog'
+`)
 	flag.BoolVar(&edited, "edited", false, "[convert] only convert images that have been edited with rawtherapee")
 	flag.BoolVar(&checksum, "sum", false, "[import] dry-run and report non-identical files with duplicate filenames")
 	flag.StringVar(&sizes, "sizes", "1920", "[convert] comma separated list of sizes (longest image dimension will be scaled to this size) (e.g.: 3840,1920,800)")
@@ -496,6 +502,16 @@ e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 					exit(err)
 					converted = append(converted, fmt.Sprintf("Converted[]: %s", p))
 				}
+
+				tags := make([]string, 0, len(info.m.Tags))
+				for _, t := range info.m.Tags {
+					tags = append(tags, fmt.Sprintf("Tags[]: %s", t))
+				}
+				t := strings.Join(tags, "\n")
+				if t == "" {
+					t = "Tags[]:"
+				}
+
 				c := strings.Join(converted, "\n")
 				if c == "" {
 					c = "Converted[]:"
@@ -509,6 +525,7 @@ Rank: %d
 Date: %s
 %s
 %s
+%s
 `,
 						f,
 						info.m.Size,
@@ -517,6 +534,7 @@ Date: %s
 						info.m.CreatedTime().Format(time.RFC3339),
 						l,
 						c,
+						t,
 					),
 				)
 			}
@@ -571,6 +589,22 @@ Date: %s
 		exit(errors.New("no actions provided"))
 	}
 
+	tagslist := make([]map[string]struct{}, 0, len(tags))
+	for _, t := range tags {
+		_ors := strings.Split(t, ",")
+		ors := make(map[string]struct{}, len(_ors))
+		for _, ot := range _ors {
+			ot = strings.TrimSpace(ot)
+			if ot == "" {
+				continue
+			}
+			ors[ot] = struct{}{}
+		}
+		if len(ors) != 0 {
+			tagslist = append(tagslist, ors)
+		}
+	}
+
 	act := strings.Split(actions, ",")
 	for _, action := range act {
 		filter = func(f *importer.File) bool {
@@ -581,6 +615,19 @@ Date: %s
 			}
 			if meta.Rating >= ratingLTFilter {
 				return false
+			}
+
+			for _, and := range tagslist {
+				match := false
+				for _, t := range meta.Tags {
+					if _, ok := and[t]; ok {
+						match = true
+						break
+					}
+				}
+				if !match {
+					return false
+				}
 			}
 
 			return _filter(meta, f)
