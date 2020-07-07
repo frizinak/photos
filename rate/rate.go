@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/frizinak/photos/importer"
@@ -83,6 +84,10 @@ type Rater struct {
 	fullscreen bool
 	zoom       bool
 	auto       bool
+	tagging    bool
+	text       bool
+	inputCB    func([]rune) error
+	input      []rune
 
 	index int
 
@@ -96,6 +101,7 @@ type Rater struct {
 		clrRed, clrRedContrast     string
 		clrGreen, clrGreenContrast string
 		clrBlue, clrBlueContrast   string
+		none                       string
 	}
 
 	files []*importer.File
@@ -119,29 +125,195 @@ func New(log *log.Logger, files []*importer.File) *Rater {
 		r.term.clrBlueContrast = "\033[37m"
 	}
 
+	r.term.none = "\033[0m"
+
 	return r
 }
 
-func (r *Rater) onKey(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-	if action == glfw.Release {
+func (r *Rater) toggleTagging() {
+	r.tagging = !r.tagging
+	if !r.tagging {
+		r.text = false
+		r.clear()
+		r.print(r.file())
+		r.usage()
+	}
+}
+
+func (r *Rater) onText(w *glfw.Window, char rune) {
+	if !r.text {
 		return
 	}
-	// if key == glfw.KeyT && mods == glfw.ModControl {
-	// 	tagMode = !tagMode
-	// 	enabled := "enabled "
-	// 	clr, clrContrast := termClrRed, termClrRedContrast
-	// 	if !tagMode {
-	// 		clr, clrContrast = termClrGreen, termClrGreenContrast
-	// 		enabled = "disabled"
-	// 	}
-	// 	fmt.Printf("%s%s   tagmode %s    \033[0m\n", clr, clrContrast, enabled)
-	// }
-	// if tagMode {
-	// 	return
-	// }
 
-	if key == glfw.KeyQ {
-		r.window.SetShouldClose(true)
+	r.input = append(r.input, char)
+	fmt.Print(string(char))
+}
+
+func commaSep(v string) []string {
+	s := strings.Split(v, ",")
+	c := make([]string, 0, len(s))
+	for _, t := range s {
+		t = strings.TrimSpace(t)
+		if t != "" {
+			c = append(c, t)
+		}
+	}
+	return c
+}
+
+func (r *Rater) onKey(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	if r.tagging {
+		help := func(file *importer.File) {
+			r.clear()
+			r.print(file)
+			fmt.Printf(`
+%s%sTAGGING%s
+a            : add tag(s)
+d            : delete tag(s)
+c            : copy tags from previous image
+m            : modify tags
+q | esc      : cancel
+`,
+				r.term.clrBlue,
+				r.term.clrBlueContrast,
+				r.term.none,
+			)
+
+		}
+
+		if r.text {
+			if action == glfw.Release {
+				return
+			}
+			switch key {
+			case glfw.KeyBackspace:
+				if len(r.input) != 0 {
+					r.input = r.input[0 : len(r.input)-1]
+					fmt.Print("\b\033[K")
+				}
+			case glfw.KeyEnter:
+				fmt.Println()
+				fmt.Println("input:", string(r.input))
+				if r.inputCB != nil {
+					if err := r.inputCB(r.input); err != nil {
+						r.log.Println(err)
+					}
+				}
+				r.text = false
+				r.input = make([]rune, 0)
+				help(r.file())
+			case glfw.KeyEscape:
+				r.inputCB = nil
+				if r.text {
+					r.text = false
+				} else if r.tagging {
+					r.toggleTagging()
+				}
+			}
+			return
+		}
+
+		if action != glfw.Release {
+			return
+		}
+
+		file := r.file()
+		help(file)
+		switch key {
+		case glfw.KeyQ, glfw.KeyEscape:
+			r.toggleTagging()
+
+		case glfw.KeyC:
+			var last meta.Tags
+			if r.index == 0 {
+				return
+			}
+			r.updateMeta(r.getFile(r.index-1), func(m *meta.Meta) (bool, error) {
+				last = m.Tags
+				return false, nil
+			})
+			r.updateMeta(file, func(m *meta.Meta) (bool, error) {
+				for _, t := range last {
+					m.Tags = append(m.Tags, t)
+				}
+				return true, nil
+			})
+			help(file)
+
+		case glfw.KeyA:
+			r.input = make([]rune, 0)
+			r.inputCB = func(input []rune) error {
+				tags := commaSep(string(input))
+				if len(tags) == 0 {
+					return nil
+				}
+				r.updateMeta(file, func(m *meta.Meta) (bool, error) {
+					m.Tags = append(m.Tags, tags...)
+					return true, nil
+				})
+				return nil
+			}
+			fmt.Print("add tag: ")
+			r.text = true
+
+		case glfw.KeyM:
+			r.updateMeta(file, func(m *meta.Meta) (bool, error) {
+				r.input = []rune(strings.Join(m.Tags, ","))
+				return false, nil
+			})
+			r.inputCB = func(input []rune) error {
+				tags := commaSep(string(input))
+				r.updateMeta(file, func(m *meta.Meta) (bool, error) {
+					m.Tags = tags
+					return true, nil
+				})
+				return nil
+			}
+			fmt.Print("tags: ", string(r.input))
+			r.text = true
+
+		case glfw.KeyD:
+			var met meta.Meta
+			r.updateMeta(r.file(), func(m *meta.Meta) (bool, error) {
+				met = *m
+				return false, nil
+			})
+			r.input = make([]rune, 0)
+			for i, t := range met.Tags {
+				fmt.Printf("%2d) %s\n", i+1, t)
+			}
+			r.inputCB = func(input []rune) error {
+				strs := commaSep(string(input))
+				ints := make(map[int]struct{}, len(strs))
+				for i := range strs {
+					n, err := strconv.Atoi(strs[i])
+					if err != nil {
+						return errors.New("invalid input")
+					}
+					ints[n-1] = struct{}{}
+				}
+
+				r.updateMeta(file, func(m *meta.Meta) (bool, error) {
+					tags := make(meta.Tags, 0, len(m.Tags))
+					for i := range m.Tags {
+						if _, ok := ints[i]; !ok {
+							tags = append(tags, m.Tags[i])
+						}
+					}
+					m.Tags = tags
+					return true, nil
+				})
+				return nil
+			}
+			fmt.Print("delete tag: ")
+			r.text = true
+
+		}
+		return
+	}
+
+	if action == glfw.Release {
+		return
 	}
 
 	li := r.index
@@ -151,6 +323,10 @@ func (r *Rater) onKey(w *glfw.Window, key glfw.Key, scancode int, action glfw.Ac
 	var next bool
 
 	switch key {
+	case glfw.KeyQ:
+		r.window.SetShouldClose(true)
+	case glfw.KeyT:
+		r.toggleTagging()
 	case glfw.KeyF:
 		r.toggleFS()
 	case glfw.KeyZ:
@@ -159,9 +335,6 @@ func (r *Rater) onKey(w *glfw.Window, key glfw.Key, scancode int, action glfw.Ac
 		r.addIndex(-1)
 	case glfw.KeyRight, glfw.KeySpace:
 		r.addIndex(1)
-
-	case glfw.KeyH:
-		r.usage()
 
 	case glfw.KeyA:
 		r.auto = !r.auto
@@ -218,11 +391,10 @@ func (r *Rater) onKey(w *glfw.Window, key glfw.Key, scancode int, action glfw.Ac
 		})
 	}
 
-	if changed {
-		r.print(r.getFile(li), false)
-	}
-	if doprint {
-		r.print(r.file(), true)
+	if changed || doprint {
+		r.clear()
+		r.print(r.file())
+		r.usage()
 	}
 }
 
@@ -274,10 +446,10 @@ func (r *Rater) toggleFS() {
 }
 
 func (r *Rater) usage() {
-	fmt.Print(`Usage:
+	fmt.Printf(`
+%s%sUSAGE%s
 q            : quit
 f            : toggle fullscreen
-h            : print this
 z            : toggle zoom
 
 a            : toggle automatically go to next image after deleting or rating
@@ -286,12 +458,14 @@ p            : print filename and meta
 d | delete   : delete
 u            : undelete
 
+t            : enter tagging mode
+
 1-5          : rate 1-5
 0            : remove rating
 
 left | space : next
 right        : previous
-`)
+`, r.term.clrBlue, r.term.clrBlueContrast, r.term.none)
 }
 
 func (r *Rater) fatal(err error) {
@@ -321,24 +495,32 @@ func (r *Rater) updateMeta(f *importer.File, mod func(*meta.Meta) (save bool, er
 	}
 }
 
-func (r *Rater) print(f *importer.File, fn bool) {
+func (r *Rater) clear() {
+	fmt.Print("\033[2J\033[H")
+}
+
+func (r *Rater) print(f *importer.File) {
 	var met meta.Meta
 	r.updateMeta(f, func(m *meta.Meta) (bool, error) {
 		met = *m
 		return false, nil
 	})
-	if fn {
-		fmt.Println()
-		fmt.Printf(
-			"\033[1m%s%s   %d/%d   \033[0m\n%s [%s]\n",
-			r.term.clrBlue,
-			r.term.clrBlueContrast,
-			r.index+1,
-			len(r.files),
-			f.Filename(),
-			filepath.Base(importer.NicePath("", f, met)),
-		)
+
+	tagslist := make([]string, len(met.Tags))
+	for i := range met.Tags {
+		tagslist[i] = fmt.Sprintf("%s%s%s\033[0m", r.term.clrBlue, r.term.clrBlueContrast, met.Tags[i])
 	}
+
+	fmt.Printf(
+		"\033[1m%s%s   %d/%d   \033[0m %s\n%s [%s]\n",
+		r.term.clrBlue,
+		r.term.clrBlueContrast,
+		r.index+1,
+		len(r.files),
+		strings.Join(tagslist, " "),
+		f.Filename(),
+		filepath.Base(importer.NicePath("", f, met)),
+	)
 
 	delString := fmt.Sprintf("\033[1m%s%s  keep  \033[0m", r.term.clrGreen, r.term.clrGreenContrast)
 	if met.Deleted {
@@ -377,17 +559,9 @@ func (r *Rater) Run() error {
 	r.proj = mgl32.Ortho2D(0, 800, 800, 0)
 	r.index = 0
 
+	r.clear()
+	r.print(r.file())
 	r.usage()
-	r.print(r.file(), true)
-
-	// tagMode := false
-	// onText := func(w *glfw.Window, char rune) {
-	// 	if !tagMode {
-	// 		return
-	// 	}
-
-	// 	fmt.Println(string(char))
-	// }
 
 	if err := gl.Init(); err != nil {
 		return err
@@ -396,7 +570,7 @@ func (r *Rater) Run() error {
 	r.window.SetFramebufferSizeCallback(r.onResize)
 	r.window.SetPosCallback(r.onPos)
 	r.window.SetKeyCallback(r.onKey)
-	// window.SetCharCallback(onText)
+	r.window.SetCharCallback(r.onText)
 	w, h := r.window.GetFramebufferSize()
 	r.onResize(r.window, w, h)
 

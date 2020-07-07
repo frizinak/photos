@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -18,6 +19,7 @@ func (t Tags) Unique() Tags {
 	for i := range tm {
 		nt = append(nt, i)
 	}
+	sort.Strings(nt)
 	return nt
 }
 
@@ -64,6 +66,7 @@ func Load(path string) (Meta, error) {
 }
 
 func (m Meta) Save(path string) error {
+	m.Tags = m.Tags.Unique()
 	tmp := path + ".tmp"
 	f, err := os.Create(tmp)
 	if err != nil {

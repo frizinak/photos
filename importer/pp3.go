@@ -73,7 +73,7 @@ func (i *Importer) PP3ToMeta(link string) error {
 			}
 			kws = append(kws, kw)
 		}
-		m.Tags = kws.Unique()
+		m.Tags = kws
 	}
 
 	currentTime := time.Now().Local()
