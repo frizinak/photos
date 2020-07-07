@@ -104,12 +104,24 @@ type Rater struct {
 		none                       string
 	}
 
+	compl struct {
+		imp   *importer.Importer
+		list  meta.Tags
+		state struct {
+			prefix string
+			suffix []string
+			index  int
+		}
+	}
+
 	files []*importer.File
 	log   *log.Logger
 }
 
-func New(log *log.Logger, files []*importer.File) *Rater {
+func New(log *log.Logger, files []*importer.File, imp *importer.Importer) *Rater {
 	r := &Rater{files: files, log: log}
+	r.compl.imp = imp
+
 	r.term.clrRed = "\033[48;5;124m"
 	r.term.clrRedContrast = "\033[38;5;231m"
 	r.term.clrGreen = "\033[48;5;70m"
@@ -128,6 +140,47 @@ func New(log *log.Logger, files []*importer.File) *Rater {
 	r.term.none = "\033[0m"
 
 	return r
+}
+
+func (r *Rater) addCompletion(str ...string) {
+	r.initCompletion()
+	r.compl.list = append(r.compl.list, str...).Unique()
+}
+
+func (r *Rater) completion(str string) []string {
+	if len(str) < 2 {
+		return nil
+	}
+
+	r.initCompletion()
+
+	l := make([]string, 0, 1)
+	for _, t := range r.compl.list {
+		if strings.HasPrefix(t, str) {
+			l = append(l, t[len(str):])
+		}
+	}
+
+	return l
+}
+
+func (r *Rater) initCompletion() {
+	if r.compl.list == nil {
+		r.compl.list = make(meta.Tags, 0)
+		err := r.compl.imp.All(func(f *importer.File) (bool, error) {
+			m, err := importer.GetMeta(f)
+			if err != nil {
+				return true, nil
+			}
+			r.compl.list = append(r.compl.list, m.Tags...)
+			return true, nil
+		})
+		if err != nil {
+			panic(err)
+		}
+
+		r.compl.list = r.compl.list.Unique()
+	}
 }
 
 func (r *Rater) toggleTagging() {
@@ -185,15 +238,55 @@ q | esc      : cancel
 			if action == glfw.Release {
 				return
 			}
+
+			if key != glfw.KeyTab {
+				r.compl.state.index = -1
+				r.compl.state.prefix = ""
+			}
+
 			switch key {
 			case glfw.KeyBackspace:
 				if len(r.input) != 0 {
 					r.input = r.input[0 : len(r.input)-1]
 					fmt.Print("\b\033[K")
 				}
+			case glfw.KeyTab:
+				if len(r.input) == 0 || r.input[len(r.input)-1] == ',' {
+					return
+				}
+
+				if r.compl.state.index != -1 && len(r.compl.state.suffix) > 0 {
+					prev := r.compl.state.suffix[r.compl.state.index]
+					for range prev {
+						fmt.Print("\b")
+					}
+					fmt.Print("\033[K")
+					r.input = r.input[0 : len(r.input)-len(prev)]
+				}
+
+				list := commaSep(string(r.input))
+				last := list[len(list)-1]
+				if last != r.compl.state.prefix {
+					r.compl.state.prefix = last
+					r.compl.state.suffix = r.completion(last)
+					r.compl.state.index = -1
+				}
+
+				if len(r.compl.state.suffix) == 0 {
+					return
+				}
+
+				r.compl.state.index++
+				if r.compl.state.index > len(r.compl.state.suffix)-1 {
+					r.compl.state.index = 0
+				}
+
+				rest := r.compl.state.suffix[r.compl.state.index]
+				if rest != "" {
+					r.input = append(r.input, []rune(rest)...)
+					fmt.Print(rest)
+				}
 			case glfw.KeyEnter:
-				fmt.Println()
-				fmt.Println("input:", string(r.input))
 				if r.inputCB != nil {
 					if err := r.inputCB(r.input); err != nil {
 						r.log.Println(err)
@@ -236,6 +329,7 @@ q | esc      : cancel
 			r.updateMeta(file, func(m *meta.Meta) (bool, error) {
 				for _, t := range last {
 					m.Tags = append(m.Tags, t)
+					r.addCompletion(t)
 				}
 				return true, nil
 			})
@@ -250,6 +344,7 @@ q | esc      : cancel
 				}
 				r.updateMeta(file, func(m *meta.Meta) (bool, error) {
 					m.Tags = append(m.Tags, tags...)
+					r.addCompletion(tags...)
 					return true, nil
 				})
 				return nil
@@ -266,6 +361,7 @@ q | esc      : cancel
 				tags := commaSep(string(input))
 				r.updateMeta(file, func(m *meta.Meta) (bool, error) {
 					m.Tags = tags
+					r.addCompletion(tags...)
 					return true, nil
 				})
 				return nil
@@ -302,6 +398,7 @@ q | esc      : cancel
 						}
 					}
 					m.Tags = tags
+					r.addCompletion(tags...)
 					return true, nil
 				})
 				return nil
