@@ -32,6 +32,12 @@ rate: cleanup
 	$(PHOTOS_CMD) -filter unrated -actions rate
 	$(PHOTOS_CMD) -filter all -actions link,sync-meta,link
 
+## tag: tag/rate/delete untagged images and sync.
+.PHONY: tag
+tag: cleanup
+	$(PHOTOS_CMD) -filter normal -actions rate -tags '-'
+	$(PHOTOS_CMD) -filter all -actions link,sync-meta,link
+
 ## convert: convert all images where rating > $(RatingGT) to jpegs.
 .PHONY: convert
 convert: cleanup
