@@ -79,6 +79,7 @@ func main() {
 - show           Show raws (filter with -filter)
 - show-jpegs     Show jpegs (filter with -filter) (see -no-raw)
 - show-links     Show links (filter with -filter) (see -no-raw)
+- show-tags      Show all tags
 - info           Show info for given RAWs
 - update-meta    Rewrite .meta file (filter with -filter)
 - link           Create collection symlinks in the given directory (-collection)
@@ -346,6 +347,20 @@ e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 				}
 				return true, nil
 			})
+		},
+		"show-tags": func() {
+			tags := make(meta.Tags, 0)
+			all(func(f *importer.File) (bool, error) {
+				m, err := importer.GetMeta(f)
+				if err != nil {
+					return false, err
+				}
+				tags = append(tags, m.Tags...)
+				return true, nil
+			})
+			for _, t := range tags.Unique() {
+				stdout(t)
+			}
 		},
 		"update-meta": func() {
 			l.Println("updating meta")

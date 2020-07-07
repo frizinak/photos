@@ -202,6 +202,7 @@ q | esc      : cancel
 				r.text = false
 				r.input = make([]rune, 0)
 				help(r.file())
+				r.nextIfAuto()
 			case glfw.KeyEscape:
 				r.inputCB = nil
 				if r.text {
@@ -320,7 +321,6 @@ q | esc      : cancel
 	upd := update{-1, -1}
 	var changed bool
 	var doprint bool
-	var next bool
 
 	switch key {
 	case glfw.KeyQ:
@@ -346,7 +346,7 @@ q | esc      : cancel
 
 	case glfw.KeyD, glfw.KeyDelete:
 		upd.Deleted = 1
-		next = true
+		r.nextIfAuto()
 	case glfw.KeyU:
 		upd.Deleted = 0
 
@@ -354,26 +354,22 @@ q | esc      : cancel
 		upd.Rating = 0
 	case glfw.Key1:
 		upd.Rating = 1
-		next = true
+		r.nextIfAuto()
 	case glfw.Key2:
 		upd.Rating = 2
-		next = true
+		r.nextIfAuto()
 	case glfw.Key3:
 		upd.Rating = 3
-		next = true
+		r.nextIfAuto()
 	case glfw.Key4:
 		upd.Rating = 4
-		next = true
+		r.nextIfAuto()
 	case glfw.Key5:
 		upd.Rating = 5
-		next = true
+		r.nextIfAuto()
 
 	case glfw.KeyP:
 		doprint = true
-	}
-
-	if next && r.auto {
-		r.addIndex(1)
 	}
 
 	doprint = doprint || li != r.index
@@ -406,6 +402,11 @@ func (r *Rater) getFile(index int) *importer.File {
 	return r.files[index]
 }
 
+func (r *Rater) nextIfAuto() {
+	if r.auto {
+		r.addIndex(1)
+	}
+}
 func (r *Rater) addIndex(i int) {
 	r.setIndex(r.index + i)
 }
