@@ -1,9 +1,64 @@
 package importer
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 )
+
+func rmEmpty(dir string) (bool, error) {
+	d, err := os.Open(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	list, err := d.Readdir(-1)
+	d.Close()
+	if err != nil {
+		return false, err
+	}
+
+	files := false
+	for _, item := range list {
+		fp := filepath.Join(dir, item.Name())
+		if item.IsDir() {
+			f, err := rmEmpty(fp)
+			if err != nil {
+				return files, err
+			}
+			if f {
+				files = true
+			}
+			continue
+		}
+
+		files = true
+	}
+
+	if !files {
+		if err := os.Remove(dir); err != nil {
+			return files, err
+		}
+	}
+
+	return files, nil
+}
+
+func (i *Importer) DoCleanup(paths []string) error {
+	for _, f := range paths {
+		if err := os.Remove(f); err != nil {
+			return err
+		}
+	}
+
+	if _, err := rmEmpty(i.convDir); err != nil {
+		return err
+	}
+	_, err := rmEmpty(i.colDir)
+	return err
+}
 
 func (i *Importer) Cleanup(minRating int) ([]string, error) {
 	all := make([]*File, 0, 1000)

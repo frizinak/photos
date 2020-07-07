@@ -68,7 +68,7 @@ func (i *Importer) scanDir(dir string, cb func(path string) (bool, error)) (bool
 	for _, item := range list {
 		fp := filepath.Join(dir, item.Name())
 		if item.IsDir() {
-			cont, err := i.scanDir(filepath.Join(dir, item.Name()), cb)
+			cont, err := i.scanDir(fp, cb)
 			if !cont || err != nil {
 				return cont, err
 			}

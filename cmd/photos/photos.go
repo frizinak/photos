@@ -409,24 +409,19 @@ e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 		"cleanup": func() {
 			list, err := imp.Cleanup(ratingGTFilter)
 			exit(err)
-			if len(list) == 0 {
-				return
-			}
 
 			for _, p := range list {
 				stdout(p)
 			}
 			answer := "y"
-			if !alwaysYes {
+			if len(list) != 0 && !alwaysYes {
 				fmt.Print("Delete all? [y/N]: ")
 				answer = ask()
 			}
-			if answer == "y" || answer == "Y" {
-				for _, p := range list {
-					exit(os.Remove(p))
-				}
-				fmt.Println("done")
+			if answer != "y" && answer != "Y" {
+				list = []string{}
 			}
+			exit(imp.DoCleanup(list))
 		},
 		"info": func() {
 			files := flag.Args()
