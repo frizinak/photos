@@ -100,6 +100,9 @@ func main() {
 e.g:
 photo must be tagged: (outside || sunny) && dog
 -tags 'outside,sunny' -tags 'dog'
+
+special case: '-' only matches files with no tags
+special case: '*' only matches files with tags
 `)
 	flag.BoolVar(&edited, "edited", false, "[convert] only convert images that have been edited with rawtherapee")
 	flag.BoolVar(&checksum, "sum", false, "[import] dry-run and report non-identical files with duplicate filenames")
@@ -614,6 +617,15 @@ Date: %s
 
 			for _, and := range tagslist {
 				match := false
+				if _, ok := and["-"]; ok {
+					match = len(meta.Tags) == 0
+				}
+				if _, ok := and["*"]; ok {
+					if len(meta.Tags) != 0 {
+						match = true
+					}
+				}
+
 				for _, t := range meta.Tags {
 					if _, ok := and[t]; ok {
 						match = true
