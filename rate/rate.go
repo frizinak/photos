@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"unsafe"
 
 	"github.com/frizinak/photos/importer"
 	"github.com/frizinak/photos/meta"
@@ -20,19 +19,20 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 )
 
-func init() {
-	runtime.LockOSThread()
-}
-
 const (
-	FS       = 4
-	Stride   = 4
-	Vertices = 4
+	fs       = 4
+	stride   = 4
+	vertices = 4
 )
 
-type Points [Stride * Vertices]float32
+type points [stride * vertices]float32
 
-func Buf(d *Points, x0, y0, x1, y1 float32) {
+type update struct {
+	Rating  int
+	Deleted int
+}
+
+func buf(d *points, x0, y0, x1, y1 float32) {
 	d[0] = x1
 	d[1] = y1
 	d[4] = x1
@@ -72,111 +72,213 @@ func initialize() (*glfw.Window, error) {
 	return window, nil
 }
 
-func Run(log *log.Logger, files []*importer.File) error {
-	var gErr error
-	if len(files) == 0 {
-		return errors.New("no files")
-	}
-	window, err := initialize()
-	defer glfw.Terminate()
-	if err != nil {
-		return err
-	}
-	monitor := glfw.GetPrimaryMonitor()
-	videoMode := monitor.GetVideoMode()
-	var windowX, windowY int = window.GetPos()
-	var windowW, windowH int = window.GetSize()
-	fullscreen := false
-	proj := mgl32.Ortho2D(0, 800, 800, 0)
-	index := 0
+type Rater struct {
+	window                             *glfw.Window
+	monitor                            *glfw.Monitor
+	videoMode                          *glfw.VidMode
+	windowX, windowY, windowW, windowH int
 
-	doError := func(err error) {
-		if err != nil {
-			window.SetShouldClose(true)
-			gErr = err
-		}
-	}
+	realWidth, realHeight int
 
-	updateMeta := func(f *importer.File, mod func(*meta.Meta) (save bool, err error)) {
-		m, err := importer.EnsureMeta(f)
-		if err != nil {
-			doError(err)
-			return
-		}
+	fullscreen bool
+	zoom       bool
+	auto       bool
 
-		rm := &m
-		if save, err := mod(rm); !save || err != nil {
-			if err != nil {
-				doError(err)
-			}
-			return
-		}
+	index int
 
-		if err := importer.SaveMeta(f, *rm); err != nil {
-			doError(err)
-		}
+	invalidateVAOs bool
+
+	proj mgl32.Mat4
+
+	gErr error
+
+	term struct {
+		clrRed, clrRedContrast     string
+		clrGreen, clrGreenContrast string
+		clrBlue, clrBlueContrast   string
 	}
 
-	termClrRed := "\033[48;5;124m"
-	termClrRedContrast := "\033[38;5;231m"
-	termClrGreen := "\033[48;5;70m"
-	termClrGreenContrast := "\033[38;5;16m"
-	termClrBlue := "\033[48;5;56m"
-	termClrBlueContrast := "\033[38;5;231m"
+	files []*importer.File
+	log   *log.Logger
+}
+
+func New(log *log.Logger, files []*importer.File) *Rater {
+	r := &Rater{files: files, log: log}
+	r.term.clrRed = "\033[48;5;124m"
+	r.term.clrRedContrast = "\033[38;5;231m"
+	r.term.clrGreen = "\033[48;5;70m"
+	r.term.clrGreenContrast = "\033[38;5;16m"
+	r.term.clrBlue = "\033[48;5;56m"
+	r.term.clrBlueContrast = "\033[38;5;231m"
 	if term := os.Getenv("TERM"); !strings.Contains(term, "256color") {
-		termClrRed = "\033[41m"
-		termClrRedContrast = "\033[37m"
-		termClrGreen = "\033[42m"
-		termClrGreenContrast = ""
-		termClrBlue = "\033[44m"
-		termClrBlueContrast = "\033[37m"
+		r.term.clrRed = "\033[41m"
+		r.term.clrRedContrast = "\033[37m"
+		r.term.clrGreen = "\033[42m"
+		r.term.clrGreenContrast = ""
+		r.term.clrBlue = "\033[44m"
+		r.term.clrBlueContrast = "\033[37m"
 	}
 
-	print := func(f *importer.File, fn bool) {
-		var met meta.Meta
-		updateMeta(f, func(m *meta.Meta) (bool, error) {
-			met = *m
-			return false, nil
+	return r
+}
+
+func (r *Rater) onKey(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	if action == glfw.Release {
+		return
+	}
+	// if key == glfw.KeyT && mods == glfw.ModControl {
+	// 	tagMode = !tagMode
+	// 	enabled := "enabled "
+	// 	clr, clrContrast := termClrRed, termClrRedContrast
+	// 	if !tagMode {
+	// 		clr, clrContrast = termClrGreen, termClrGreenContrast
+	// 		enabled = "disabled"
+	// 	}
+	// 	fmt.Printf("%s%s   tagmode %s    \033[0m\n", clr, clrContrast, enabled)
+	// }
+	// if tagMode {
+	// 	return
+	// }
+
+	if key == glfw.KeyQ {
+		r.window.SetShouldClose(true)
+	}
+
+	li := r.index
+	upd := update{-1, -1}
+	var changed bool
+	var doprint bool
+	var next bool
+
+	switch key {
+	case glfw.KeyF:
+		r.toggleFS()
+	case glfw.KeyZ:
+		r.zoom = !r.zoom
+	case glfw.KeyLeft:
+		r.addIndex(-1)
+	case glfw.KeyRight, glfw.KeySpace:
+		r.addIndex(1)
+
+	case glfw.KeyH:
+		r.usage()
+
+	case glfw.KeyA:
+		r.auto = !r.auto
+		enabled := "enabled"
+		if !r.auto {
+			enabled = "disabled"
+		}
+		fmt.Printf("auto switching images %s\n", enabled)
+
+	case glfw.KeyD, glfw.KeyDelete:
+		upd.Deleted = 1
+		next = true
+	case glfw.KeyU:
+		upd.Deleted = 0
+
+	case glfw.Key0:
+		upd.Rating = 0
+	case glfw.Key1:
+		upd.Rating = 1
+		next = true
+	case glfw.Key2:
+		upd.Rating = 2
+		next = true
+	case glfw.Key3:
+		upd.Rating = 3
+		next = true
+	case glfw.Key4:
+		upd.Rating = 4
+		next = true
+	case glfw.Key5:
+		upd.Rating = 5
+		next = true
+
+	case glfw.KeyP:
+		doprint = true
+	}
+
+	if next && r.auto {
+		r.addIndex(1)
+	}
+
+	doprint = doprint || li != r.index
+
+	if upd.Rating > -1 || upd.Deleted > -1 {
+		changed = true
+		r.updateMeta(r.getFile(li), func(m *meta.Meta) (bool, error) {
+			if upd.Deleted > -1 {
+				m.Deleted = upd.Deleted == 1
+			}
+			if upd.Rating > -1 {
+				m.Rating = upd.Rating
+			}
+			return true, nil
 		})
-		if fn {
-			fmt.Println()
-			fmt.Printf(
-				"\033[1m%s%s   %d/%d   \033[0m\n%s [%s]\n",
-				termClrBlue,
-				termClrBlueContrast,
-				index+1,
-				len(files),
-				f.Filename(),
-				filepath.Base(importer.NicePath("", f, met)),
-			)
-		}
-
-		delString := fmt.Sprintf("\033[1m%s%s  keep  \033[0m", termClrGreen, termClrGreenContrast)
-		if met.Deleted {
-			delString = fmt.Sprintf("\033[1m%s%s delete \033[0m", termClrRed, termClrRedContrast)
-		}
-
-		color := termClrRed
-		colorContrast := termClrRedContrast
-		if met.Rating > 2 {
-			color = termClrGreen
-			colorContrast = termClrGreenContrast
-		}
-
-		fmt.Printf("%s %s%s %d/5 \033[0m\n", delString, color, colorContrast, met.Rating)
 	}
 
-	type Update struct {
-		Rating  int
-		Deleted int
+	if changed {
+		r.print(r.getFile(li), false)
 	}
-	var auto bool
+	if doprint {
+		r.print(r.file(), true)
+	}
+}
 
-	usage := func() {
-		fmt.Print(`Usage:
+func (r *Rater) file() *importer.File {
+	return r.files[r.index]
+}
+
+func (r *Rater) getFile(index int) *importer.File {
+	return r.files[index]
+}
+
+func (r *Rater) addIndex(i int) {
+	r.setIndex(r.index + i)
+}
+
+func (r *Rater) setIndex(i int) {
+	r.index = i
+	if r.index < 0 {
+		r.index = 0
+	} else if r.index >= len(r.files) {
+		r.index = len(r.files) - 1
+	}
+}
+
+func (r *Rater) onResize(wnd *glfw.Window, width, height int) {
+	r.realWidth, r.realHeight = width, height
+	r.invalidateVAOs = true
+	gl.Viewport(0, 0, int32(width), int32(height))
+	r.proj = mgl32.Ortho2D(0, float32(width), float32(height), 0)
+	if r.fullscreen {
+		return
+	}
+	r.windowW, r.windowH = width, height
+}
+func (r *Rater) onPos(wnd *glfw.Window, x, y int) {
+	if r.fullscreen {
+		return
+	}
+	r.windowX, r.windowY = x, y
+}
+
+func (r *Rater) toggleFS() {
+	r.fullscreen = !r.fullscreen
+	if r.fullscreen {
+		r.window.SetMonitor(r.monitor, 0, 0, r.videoMode.Width, r.videoMode.Height, r.videoMode.RefreshRate)
+		return
+	}
+	r.window.SetMonitor(nil, r.windowX, r.windowY, r.windowW, r.windowH, r.videoMode.RefreshRate)
+}
+
+func (r *Rater) usage() {
+	fmt.Print(`Usage:
 q            : quit
 f            : toggle fullscreen
 h            : print this
+z            : toggle zoom
 
 a            : toggle automatically go to next image after deleting or rating
 p            : print filename and meta
@@ -190,149 +292,113 @@ u            : undelete
 left | space : next
 right        : previous
 `)
-	}
-	usage()
+}
 
-	print(files[0], true)
+func (r *Rater) fatal(err error) {
+	if err != nil {
+		r.window.SetShouldClose(true)
+		r.gErr = err
+	}
+}
 
-	var realWidth, realHeight int
-	onResize := func(wnd *glfw.Window, width, height int) {
-		realWidth, realHeight = width, height
-		gl.Viewport(0, 0, int32(width), int32(height))
-		proj = mgl32.Ortho2D(0, float32(width), float32(height), 0)
-		if fullscreen {
-			return
-		}
-		windowW, windowH = width, height
-	}
-	onPos := func(wnd *glfw.Window, x, y int) {
-		if fullscreen {
-			return
-		}
-		windowX, windowY = x, y
-	}
-	onScroll := func(wnd *glfw.Window, x, y float64) {
-	}
-	toggleFS := func() {
-		fullscreen = !fullscreen
-		if fullscreen {
-			window.SetMonitor(monitor, 0, 0, videoMode.Width, videoMode.Height, videoMode.RefreshRate)
-			return
-		}
-		window.SetMonitor(nil, windowX, windowY, windowW, windowH, videoMode.RefreshRate)
+func (r *Rater) updateMeta(f *importer.File, mod func(*meta.Meta) (save bool, err error)) {
+	m, err := importer.EnsureMeta(f)
+	if err != nil {
+		r.fatal(err)
+		return
 	}
 
-	checkIndex := func() {
-		if index < 0 {
-			index = 0
-		} else if index >= len(files) {
-			index = len(files) - 1
+	rm := &m
+	if save, err := mod(rm); !save || err != nil {
+		if err != nil {
+			r.fatal(err)
 		}
+		return
 	}
 
-	onKey := func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-		if action == glfw.Release {
-			return
-		}
-
-		if key == glfw.KeyQ {
-			window.SetShouldClose(true)
-		}
-
-		if key == glfw.KeyF {
-			toggleFS()
-		}
-
-		li := index
-		update := Update{-1, -1}
-		var changed bool
-		var doprint bool
-		var next bool
-
-		switch key {
-		case glfw.KeyLeft:
-			index--
-		case glfw.KeyRight, glfw.KeySpace:
-			index++
-
-		case glfw.KeyH:
-			usage()
-
-		case glfw.KeyA:
-			auto = !auto
-			enabled := "enabled"
-			if !auto {
-				enabled = "disabled"
-			}
-			fmt.Printf("auto switching images %s\n", enabled)
-
-		case glfw.KeyD, glfw.KeyDelete:
-			update.Deleted = 1
-			next = true
-		case glfw.KeyU:
-			update.Deleted = 0
-
-		case glfw.Key0:
-			update.Rating = 0
-		case glfw.Key1:
-			update.Rating = 1
-			next = true
-		case glfw.Key2:
-			update.Rating = 2
-			next = true
-		case glfw.Key3:
-			update.Rating = 3
-			next = true
-		case glfw.Key4:
-			update.Rating = 4
-			next = true
-		case glfw.Key5:
-			update.Rating = 5
-			next = true
-
-		case glfw.KeyP:
-			doprint = true
-		}
-
-		if next && auto {
-			index++
-		}
-
-		checkIndex()
-
-		doprint = doprint || li != index
-
-		if update.Rating > -1 || update.Deleted > -1 {
-			changed = true
-			updateMeta(files[li], func(m *meta.Meta) (bool, error) {
-				if update.Deleted > -1 {
-					m.Deleted = update.Deleted == 1
-				}
-				if update.Rating > -1 {
-					m.Rating = update.Rating
-				}
-				return true, nil
-			})
-		}
-
-		if changed {
-			print(files[li], false)
-		}
-		if doprint {
-			print(files[index], true)
-		}
+	if err := importer.SaveMeta(f, *rm); err != nil {
+		r.fatal(err)
 	}
+}
+
+func (r *Rater) print(f *importer.File, fn bool) {
+	var met meta.Meta
+	r.updateMeta(f, func(m *meta.Meta) (bool, error) {
+		met = *m
+		return false, nil
+	})
+	if fn {
+		fmt.Println()
+		fmt.Printf(
+			"\033[1m%s%s   %d/%d   \033[0m\n%s [%s]\n",
+			r.term.clrBlue,
+			r.term.clrBlueContrast,
+			r.index+1,
+			len(r.files),
+			f.Filename(),
+			filepath.Base(importer.NicePath("", f, met)),
+		)
+	}
+
+	delString := fmt.Sprintf("\033[1m%s%s  keep  \033[0m", r.term.clrGreen, r.term.clrGreenContrast)
+	if met.Deleted {
+		delString = fmt.Sprintf("\033[1m%s%s delete \033[0m", r.term.clrRed, r.term.clrRedContrast)
+	}
+
+	color := r.term.clrRed
+	colorContrast := r.term.clrRedContrast
+	if met.Rating > 2 {
+		color = r.term.clrGreen
+		colorContrast = r.term.clrGreenContrast
+	}
+
+	fmt.Printf("%s %s%s %d/5 \033[0m\n", delString, color, colorContrast, met.Rating)
+}
+
+func (r *Rater) Run() error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	if len(r.files) == 0 {
+		return errors.New("no files")
+	}
+	var err error
+	r.window, err = initialize()
+	defer glfw.Terminate()
+	if err != nil {
+		return err
+	}
+	r.monitor = glfw.GetPrimaryMonitor()
+	r.videoMode = r.monitor.GetVideoMode()
+	r.windowX, r.windowY = r.window.GetPos()
+	r.windowW, r.windowH = r.window.GetSize()
+	r.zoom = false
+	r.invalidateVAOs = false
+	r.fullscreen = false
+	r.proj = mgl32.Ortho2D(0, 800, 800, 0)
+	r.index = 0
+
+	r.usage()
+	r.print(r.file(), true)
+
+	// tagMode := false
+	// onText := func(w *glfw.Window, char rune) {
+	// 	if !tagMode {
+	// 		return
+	// 	}
+
+	// 	fmt.Println(string(char))
+	// }
 
 	if err := gl.Init(); err != nil {
 		return err
 	}
 
-	window.SetFramebufferSizeCallback(onResize)
-	window.SetPosCallback(onPos)
-	window.SetKeyCallback(onKey)
-	window.SetScrollCallback(onScroll)
-	w, h := window.GetFramebufferSize()
-	onResize(window, w, h)
+	r.window.SetFramebufferSizeCallback(r.onResize)
+	r.window.SetPosCallback(r.onPos)
+	r.window.SetKeyCallback(r.onKey)
+	// window.SetCharCallback(onText)
+	w, h := r.window.GetFramebufferSize()
+	r.onResize(r.window, w, h)
 
 	program, err := newProgram()
 	if err != nil {
@@ -341,15 +407,11 @@ right        : previous
 	gl.UseProgram(program)
 	gl.Enable(gl.TEXTURE_2D)
 
-	onGLError := func(source uint32, gltype uint32, id uint32, severity uint32, length int32, message string, userParam unsafe.Pointer) {
-		log.Printf("GL debug message: %s\n", message)
-	}
-	gl.DebugMessageCallback(onGLError, nil)
-	gl.Enable(gl.DEBUG_OUTPUT)
-
-	textures := make([]uint32, len(files))
-	vaos := make([]uint32, len(files))
-	dimensions := make([]image.Point, len(files))
+	textures := make([]uint32, len(r.files))
+	vaos := make([]uint32, len(r.files))
+	vbos := make([]uint32, len(r.files))
+	vaosState := make([]bool, len(r.files))
+	dimensions := make([]image.Point, len(r.files))
 	maxTex := 100
 	var tex uint32 = 0
 	var vao uint32 = 0
@@ -367,15 +429,15 @@ right        : previous
 	indices := []uint32{0, 1, 3, 1, 2, 3}
 	gl.GenBuffers(1, &ebo)
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
-	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, 6*FS, gl.Ptr(indices), gl.STATIC_DRAW)
+	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, 6*fs, gl.Ptr(indices), gl.STATIC_DRAW)
 
 	newEntry := func(index int, bounds image.Rectangle) {
 		if vaos[index] != 0 {
 			return
 		}
 
-		d := Points{}
-		Buf(&d, 0, 0, float32(bounds.Dx()), float32(bounds.Dy()))
+		d := points{}
+		buf(&d, 0, 0, float32(bounds.Dx()), float32(bounds.Dy()))
 		var vao, vbo uint32
 		gl.GenVertexArrays(1, &vao)
 		gl.GenBuffers(1, &vbo)
@@ -384,37 +446,77 @@ right        : previous
 
 		gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
 		gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-		gl.BufferData(gl.ARRAY_BUFFER, Stride*Vertices*FS, gl.Ptr(&d[0]), gl.DYNAMIC_DRAW)
+		gl.BufferData(gl.ARRAY_BUFFER, stride*vertices*fs, gl.Ptr(&d[0]), gl.DYNAMIC_DRAW)
 
 		gl.EnableVertexAttribArray(0)
-		gl.VertexAttribPointer(0, 2, gl.FLOAT, false, Stride*FS, gl.PtrOffset(0))
+		gl.VertexAttribPointer(0, 2, gl.FLOAT, false, stride*fs, gl.PtrOffset(0))
 		gl.EnableVertexAttribArray(1)
-		gl.VertexAttribPointer(1, 2, gl.FLOAT, false, Stride*FS, gl.PtrOffset(2*FS))
+		gl.VertexAttribPointer(1, 2, gl.FLOAT, false, stride*fs, gl.PtrOffset(2*fs))
 
 		gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 		gl.BindVertexArray(0)
 		gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, 0)
 
 		vaos[index] = vao + 1
+		vbos[index] = vbo + 1
 		dimensions[index] = image.Pt(bounds.Dx(), bounds.Dy())
 	}
 
+	getVAO := func(index int) (uint32, image.Point) {
+		s := vaosState[index]
+		dims := dimensions[index]
+		if r.zoom {
+			if dims.X == 0 || dims.Y == 0 {
+				dims.X, dims.Y = 1, 1
+			}
+			rat := float64(dims.X) / float64(dims.Y)
+			dims.X, dims.Y = r.realWidth, int(float64(r.realWidth)/rat)
+			if float64(r.realHeight)/float64(dims.Y) < float64(r.realWidth)/float64(dims.X) {
+				dims.X, dims.Y = int(float64(r.realHeight)*rat), r.realHeight
+			}
+		}
+
+		if !r.invalidateVAOs && s == r.zoom {
+			return vaos[index], dims
+		}
+		if vbos[index] == 0 {
+			return vaos[index], dims
+		}
+
+		r.invalidateVAOs = false
+		gl.BindBuffer(gl.ARRAY_BUFFER, vbos[index]-1)
+
+		d := points{}
+		if !r.zoom {
+			vaosState[index] = false
+			buf(&d, 0, 0, float32(dims.X), float32(dims.Y))
+			gl.BufferData(gl.ARRAY_BUFFER, stride*vertices*fs, gl.Ptr(&d[0]), gl.DYNAMIC_DRAW)
+			gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+			return vaos[index], dims
+		}
+
+		vaosState[index] = true
+		buf(&d, 0, 0, float32(dims.X), float32(dims.Y))
+		gl.BufferData(gl.ARRAY_BUFFER, stride*vertices*fs, gl.Ptr(&d[0]), gl.DYNAMIC_DRAW)
+		gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+		return vaos[index], dims
+	}
+
 	update := func() error {
-		if index == lastI {
-			return nil
-		}
-		vao = vaos[index]
-		dimension = dimensions[index]
-
-		lastI = index
-		if textures[index] != 0 {
-			tex = textures[index]
+		vao, dimension = getVAO(r.index)
+		if r.index == lastI {
 			return nil
 		}
 
-		f, err := importer.GetPreview(files[index])
+		lastI = r.index
+		if textures[r.index] != 0 {
+			tex = textures[r.index]
+			return nil
+		}
+
+		f, err := importer.GetPreview(r.file())
 		if err != nil {
-			log.Printf("WARN could not get preview for %s: %s", files[index].Path(), err)
+			log.Printf("WARN could not get preview for %s: %s", r.file().Path(), err)
 			tex = 0
 			return nil
 		}
@@ -427,26 +529,25 @@ right        : previous
 		bounds := img.Bounds()
 		imgRGBA := image.NewRGBA(bounds)
 		draw.Draw(imgRGBA, bounds, img, image.Point{}, draw.Src)
-		newEntry(index, bounds)
-		stex, err := ImgTexture(imgRGBA)
+		newEntry(r.index, bounds)
+		stex, err := imgTexture(imgRGBA)
 
 		tex = stex + 1
-		vao = vaos[index]
-		dimension = dimensions[index]
+		vao, dimension = getVAO(r.index)
 
 		if err != nil {
 			return err
 		}
-		textures[index] = tex
+		textures[r.index] = tex
 
 		for i := 0; i < len(textures); i++ {
 			if textures[i] == 0 {
 				continue
 			}
-			if i > index-maxTex/2 && i < index+maxTex/2 {
+			if i > r.index-maxTex/2 && i < r.index+maxTex/2 {
 				continue
 			}
-			err = ReleaseTexture(textures[i] - 1)
+			err = releaseTexture(textures[i] - 1)
 			if err != nil {
 				return err
 			}
@@ -455,6 +556,7 @@ right        : previous
 		return nil
 	}
 
+	var lastDim image.Point
 	frame := func() error {
 		if err = update(); err != nil {
 			return err
@@ -467,18 +569,22 @@ right        : previous
 			lastTex = tex
 			gl.BindTexture(gl.TEXTURE_2D, uint32(tex-1))
 			gl.BindVertexArray(vao - 1)
+		}
+
+		if r.proj != lastProjection {
+			gl.UniformMatrix4fv(projectionUniform, 1, false, &r.proj[0])
+			lastProjection = r.proj
 			recenter = true
 		}
 
-		if proj != lastProjection {
-			gl.UniformMatrix4fv(projectionUniform, 1, false, &proj[0])
-			lastProjection = proj
+		if dimension != lastDim {
+			lastDim = dimension
 			recenter = true
 		}
 
 		if recenter {
-			tx := realWidth/2 - dimension.X/2
-			ty := realHeight/2 - dimension.Y/2
+			tx := r.realWidth/2 - dimension.X/2
+			ty := r.realHeight/2 - dimension.Y/2
 			model = mgl32.Translate3D(float32(tx), float32(ty), 0)
 			gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
 		}
@@ -487,14 +593,14 @@ right        : previous
 		return nil
 	}
 
-	for !window.ShouldClose() {
+	for !r.window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT)
 		if err = frame(); err != nil {
 			return err
 		}
-		window.SwapBuffers()
+		r.window.SwapBuffers()
 		glfw.PollEvents()
 	}
 
-	return gErr
+	return r.gErr
 }

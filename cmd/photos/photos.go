@@ -383,7 +383,7 @@ e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 				return
 			}
 
-			exit(rate.Run(l, list))
+			exit(rate.New(l, list).Run())
 		},
 		"sync-meta": func() {
 			l.Println("syncing meta")

@@ -8,7 +8,7 @@ import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 )
 
-func ImgTexture(img *image.RGBA) (uint32, error) {
+func imgTexture(img *image.RGBA) (uint32, error) {
 	b := img.Bounds()
 	var texture uint32
 	gl.GenTextures(1, &texture)
@@ -33,7 +33,7 @@ func ImgTexture(img *image.RGBA) (uint32, error) {
 	return texture, nil
 }
 
-func ReleaseTexture(tex uint32) error {
+func releaseTexture(tex uint32) error {
 	gl.DeleteTextures(1, &tex)
 	return nil
 }
