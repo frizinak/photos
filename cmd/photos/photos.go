@@ -51,6 +51,18 @@ func exit(err error) {
 	os.Exit(1)
 }
 
+func commaSep(v string) []string {
+	s := strings.Split(v, ",")
+	c := make([]string, 0, len(s))
+	for _, t := range s {
+		t = strings.TrimSpace(t)
+		if t != "" {
+			c = append(c, t)
+		}
+	}
+	return c
+}
+
 func main() {
 	var actions string
 	var itemFilter string
@@ -92,6 +104,8 @@ func main() {
 - cleanup        Remove pp3s and jpegs for deleted RAWs
                  -filter and -lt are ignored
 				 Images whose rating is not higher than -gt will also have their jpegs deleted.
+- remove-tags    Remove tags (first non flag argument are the tags that will be removed)
+- add-tags       Add tag (first non flag argument are the tags that will be removed)
 `)
 
 	flag.StringVar(&itemFilter, "filter", "normal", "[any] filter (normal / all / deleted / unrated / unedited)")
@@ -361,6 +375,48 @@ e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 			for _, t := range tags.Unique() {
 				stdout(t)
 			}
+		},
+		"add-tags": func() {
+			t := commaSep(strings.Join(flag.Args(), ","))
+			if len(t) == 0 {
+				return
+			}
+			work(100, func(f *importer.File) error {
+				m, err := importer.GetMeta(f)
+				if err != nil {
+					return err
+				}
+
+				m.Tags = append(m.Tags, t...)
+				return importer.SaveMeta(f, m)
+			})
+		},
+		"remove-tags": func() {
+			t := commaSep(strings.Join(flag.Args(), ","))
+			if len(t) == 0 {
+				return
+			}
+
+			mp := make(map[string]struct{}, 0)
+			for _, tag := range t {
+				mp[tag] = struct{}{}
+			}
+
+			work(100, func(f *importer.File) error {
+				m, err := importer.GetMeta(f)
+				if err != nil {
+					return err
+				}
+				tags := make(meta.Tags, 0, len(m.Tags))
+				for _, tag := range m.Tags.Unique() {
+					if _, ok := mp[tag]; !ok {
+						tags = append(tags, tag)
+					}
+				}
+
+				m.Tags = tags
+				return importer.SaveMeta(f, m)
+			})
 		},
 		"update-meta": func() {
 			l.Println("updating meta")
