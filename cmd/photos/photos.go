@@ -227,18 +227,21 @@ e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 	allCounted := func(it func(f *importer.File, n, total int) (bool, error)) {
 		exit(
 			imp.AllCounted(func(f *importer.File, n, total int) (bool, error) {
+				fmt.Fprintf(os.Stderr, "\033[K\r%4d/%-4d ", n+1, total)
 				if !filter(f) {
 					return true, nil
 				}
 				return it(f, n, total)
 			}),
 		)
+		fmt.Fprintln(os.Stderr)
 	}
 
 	allList := func() []*importer.File {
 		l := make(importer.Files, 0, 100)
 		exit(
 			imp.All(func(f *importer.File) (bool, error) {
+
 				if !filter(f) {
 					return true, nil
 				}
@@ -268,20 +271,13 @@ e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 			}()
 		}
 
-		output := false
 		allCounted(func(f *importer.File, n, total int) (bool, error) {
 			work <- f
-			output = true
-			fmt.Fprintf(os.Stderr, "\033[K\r%4d/%-4d ", n+1, total)
 			return true, nil
 		})
 
 		close(work)
 		wg.Wait()
-		if output {
-			fmt.Fprintln(os.Stderr)
-		}
-
 	}
 
 	workNoProgress := func(workers int, do func(*importer.File) error) {
