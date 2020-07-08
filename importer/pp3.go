@@ -5,26 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
-	"strings"
 	"time"
 
-	"github.com/frizinak/photos/meta"
-	"gopkg.in/ini.v1"
+	"github.com/frizinak/photos/pp3"
 )
 
-func init() {
-	ini.PrettyEqual = false
-	ini.PrettyFormat = false
-	ini.PrettySection = true
-}
-
-func (i *Importer) GetPP3(link string) (*ini.File, string, error) {
+func (i *Importer) GetPP3(link string) (*pp3.PP3, string, error) {
 	pp3Path := fmt.Sprintf("%s.pp3", link)
-	pp3, err := ini.LoadSources(
-		ini.LoadOptions{IgnoreInlineComment: true},
-		pp3Path,
-	)
+	pp3, err := pp3.Load(pp3Path)
 	return pp3, pp3Path, err
 }
 
@@ -39,42 +27,14 @@ func (i *Importer) PP3ToMeta(link string) error {
 		return err
 	}
 
-	pp3, pp3Path, err := i.GetPP3(link)
+	pp, pp3Path, err := i.GetPP3(link)
 	if err != nil {
 		return err
 	}
 
-	general := pp3.Section("General")
-	if k, err := general.GetKey("InTrash"); err == nil {
-		deleted, err := k.Bool()
-		if err != nil {
-			return err
-		}
-		m.Deleted = deleted
-	}
-
-	if k, err := general.GetKey("Rank"); err == nil {
-		rank, err := k.Int()
-		if err != nil {
-			return err
-		}
-		m.Rating = rank
-	}
-
-	iptc := pp3.Section("IPTC")
-	m.Tags = nil
-	if k, err := iptc.GetKey("Keywords"); err == nil {
-		_kws := strings.Split(k.String(), ";")
-		kws := make(meta.Tags, 0, len(_kws))
-		for _, kw := range _kws {
-			kw = strings.TrimSpace(kw)
-			if kw == "" {
-				continue
-			}
-			kws = append(kws, kw)
-		}
-		m.Tags = kws
-	}
+	m.Deleted = pp.Trashed()
+	m.Rating = pp.Rank()
+	m.Tags = pp.Keywords()
 
 	currentTime := time.Now().Local()
 	if err := SaveMeta(file, m); err != nil {
@@ -97,50 +57,23 @@ func (i *Importer) MetaToPP3(link string) error {
 		return err
 	}
 
-	pp3, pp3Path, err := i.GetPP3(link)
+	pp, pp3Path, err := i.GetPP3(link)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
-		f, err := os.Create(pp3Path)
+		pp, err = pp3.New(pp3Path)
 		if err != nil {
 			return err
 		}
-		f.Close()
-		pp3, err = ini.LoadSources(ini.LoadOptions{IgnoreInlineComment: true}, pp3Path)
-		if err != nil {
-			return err
-		}
-		version := pp3.Section("Version")
-		version.Key("AppVersion").SetValue("5.8")
-		version.Key("Version").SetValue("346")
-		general := pp3.Section("General")
-		general.Key("Rank").SetValue("0")
-		general.Key("ColorLabel").SetValue("0")
-		general.Key("InTrash").SetValue("false")
-
-		crop := pp3.Section("Crop")
-		crop.Key("Enabled").SetValue("false")
-		crop.Key("X").SetValue("-1")
-		crop.Key("Y").SetValue("-1")
-		crop.Key("W").SetValue("-1")
-		crop.Key("H").SetValue("-1")
-		crop.Key("FixedRatio").SetValue("true")
-		crop.Key("Ratio").SetValue("As Image")
-		crop.Key("Guide").SetValue("Frame")
 	}
 
-	general := pp3.Section("General")
-	general.Key("Rank").SetValue(strconv.Itoa(meta.Rating))
-	general.Key("InTrash").SetValue(strconv.FormatBool(meta.Deleted))
-
-	tags := meta.Tags.Unique()
-	iptc := pp3.Section("IPTC")
-	t := fmt.Sprintf("%s;", strings.Join(tags, ";"))
-	iptc.Key("Keywords").SetValue(t)
+	pp.SetRank(meta.Rating)
+	pp.Trash(meta.Deleted)
+	pp.SetKeywords(meta.Tags.Unique())
 
 	currentTime := time.Now().Local()
-	if err := pp3.SaveTo(pp3Path); err != nil {
+	if err := pp.Save(); err != nil {
 		return err
 	}
 	os.Chtimes(metaFile(file), currentTime, currentTime)

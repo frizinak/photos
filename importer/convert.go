@@ -2,24 +2,24 @@ package importer
 
 import (
 	"bytes"
-	"crypto/sha512"
-	"encoding/hex"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 
-	"gopkg.in/ini.v1"
+	"github.com/frizinak/photos/pp3"
 )
 
-func (i *Importer) convert(link, dir, output string, pp3 *ini.File, converted map[string]string, size int) (string, error) {
-	pp3TempPath, hash, err := i.pp3Convert(link, pp3, size)
+func (i *Importer) convert(link, dir, output string, pp *pp3.PP3, converted map[string]string, size int) (string, error) {
+	pp3TempPath := fmt.Sprintf("%s.%d.pp3", link, size)
+	pp.ResizeLongest(size)
+	err := pp.SaveTo(pp3TempPath)
 	defer os.Remove(pp3TempPath)
 	if err != nil {
 		return "", err
 	}
+	hash := pp.Hash()
 
 	output = fmt.Sprintf("%s.jpg", output)
 	rel, err := filepath.Rel(dir, output)
@@ -59,53 +59,6 @@ func (i *Importer) convert(link, dir, output string, pp3 *ini.File, converted ma
 	return rel, nil
 }
 
-func (i *Importer) pp3Convert(link string, pp3 *ini.File, size int) (string, string, error) {
-	width, _ := pp3.Section("Crop").Key("W").Int()
-	height, _ := pp3.Section("Crop").Key("H").Int()
-
-	which := "1"
-	if height > width {
-		which = "2"
-	}
-
-	s := strconv.Itoa(size)
-	resize := pp3.Section("Resize")
-	resize.Key("Enabled").SetValue("true")
-	resize.Key("Scale").SetValue("1")
-	resize.Key("AppliesTo").SetValue("Cropped area")
-	resize.Key("Method").SetValue("Lanczos")
-	resize.Key("DataSpecified").SetValue(which)
-	resize.Key("Width").SetValue(s)
-	resize.Key("Height").SetValue(s)
-	resize.Key("AllowUpscaling").SetValue("false")
-
-	buf := bytes.NewBuffer(nil)
-	if _, err := pp3.WriteTo(buf); err != nil {
-		return "", "", err
-	}
-
-	tmppath := fmt.Sprintf("%s.pp3.%d", link, size)
-	f, err := os.Create(tmppath)
-	if err != nil {
-		return "", "", err
-	}
-
-	del := func() {
-		f.Close()
-		os.Remove(tmppath)
-	}
-
-	tee := io.TeeReader(buf, f)
-	hash := sha512.New()
-	if _, err := io.Copy(hash, tee); err != nil {
-		del()
-		return tmppath, "", err
-	}
-	h := hash.Sum(nil)
-	hex := hex.EncodeToString(h)
-	return tmppath, hex, err
-}
-
 func (i *Importer) Unedited(f *File) (bool, error) {
 	edited := true
 	err := i.walkLinks(f, func(link string) (bool, error) {
@@ -128,13 +81,13 @@ func (i *Importer) Unedited(f *File) (bool, error) {
 	return !edited, err
 }
 
-func pp3Edited(pp3 *ini.File) bool {
-	return pp3.Section("Exposure").HasKey("Compensation")
+func pp3Edited(pp *pp3.PP3) bool {
+	return pp.Has("Exposure", "Compensation")
 }
 
 func (i *Importer) Convert(f *File, sizes []int, editedOnly bool) error {
 	links := []string{}
-	pp3s := []*ini.File{}
+	pp3s := []*pp3.PP3{}
 	err := i.walkLinks(f, func(link string) (bool, error) {
 		pp3, _, err := i.GetPP3(link)
 		if err != nil {
@@ -164,14 +117,18 @@ func (i *Importer) Convert(f *File, sizes []int, editedOnly bool) error {
 	if err != nil {
 		return err
 	}
-	for n := range links {
+	for n, link := range links {
 		conv := meta.Converted
 		if conv == nil {
 			conv = make(map[string]string)
 		}
 		rels := make(map[string]struct{}, len(conv))
 		for _, s := range sizes {
-			base := NicePath(i.convDir, f, meta)
+			custom, err := filepath.Rel(i.colDir, link)
+			if err != nil {
+				return err
+			}
+			base := filepath.Join(i.convDir, custom)
 			dir := filepath.Dir(base)
 			fn := filepath.Base(base)
 			ext := filepath.Ext(fn)
