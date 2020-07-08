@@ -433,8 +433,8 @@ e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 		},
 		"previews": func() {
 			l.Println("creating previews")
-			work(-1, func(f *importer.File) error {
-				err := importer.EnsurePreview(f)
+			work(2, func(f *importer.File) error {
+				err := imp.EnsurePreview(f)
 				if err == importer.ErrPreviewNotPossible {
 					l.Println("WARN", f.Filename(), err)
 					return nil
@@ -476,11 +476,9 @@ e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 				rs = append(rs, i)
 			}
 
-			allCounted(func(f *importer.File, n, total int) (bool, error) {
-				fmt.Fprintf(os.Stderr, "\033[K\rConverting %4d/%-4d", n+1, total)
-				return true, imp.Convert(f, rs, edited)
+			work(2, func(f *importer.File) error {
+				return imp.Convert(f, rs, edited)
 			})
-			fmt.Fprintln(os.Stderr)
 		},
 		"cleanup": func() {
 			list, err := imp.Cleanup(ratingGTFilter)

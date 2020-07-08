@@ -1,4 +1,4 @@
-package tiff
+package imagemagick
 
 import (
 	"bytes"
@@ -62,7 +62,7 @@ func ToJPEG(r io.Reader, w io.Writer, c JPEGConfig) error {
 		args = append(args, "-resize", fmt.Sprintf("%sx%s", x, y))
 	}
 
-	args = append(args, "-quality", strconv.Itoa(c.Quality), "jpeg:-")
+	args = append(args, "-strip", "-quality", strconv.Itoa(c.Quality), "jpeg:-")
 	cmd := exec.Command("convert", args...)
 
 	cmd.Stdin = r

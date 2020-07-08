@@ -11,16 +11,44 @@ import (
 	"github.com/frizinak/photos/pp3"
 )
 
-func (i *Importer) convert(link, dir, output string, pp *pp3.PP3, converted map[string]string, size int) (string, error) {
-	pp3TempPath := fmt.Sprintf("%s.%d.pp3", link, size)
-	pp.ResizeLongest(size)
+func (i *Importer) convert(input, output string, pp *pp3.PP3) error {
+	pp3TempPath := fmt.Sprintf("%s.tmp.pp3", output)
 	err := pp.SaveTo(pp3TempPath)
 	defer os.Remove(pp3TempPath)
 	if err != nil {
-		return "", err
+		return err
 	}
-	hash := pp.Hash()
 
+	tmp := output
+	if filepath.Ext(output) != ".jpg" {
+		// bruuh
+		tmp = output + ".rawtherapeehack.jpg"
+	}
+
+	cmd := exec.Command(
+		"rawtherapee-cli",
+		"-Y",
+		"-o", tmp,
+		"-q",
+		"-p", pp3TempPath,
+		"-c", input,
+	)
+	buf := bytes.NewBuffer(nil)
+	cmd.Stderr = buf
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s: %s", err, buf)
+	}
+
+	if tmp != output {
+		return os.Rename(tmp, output)
+	}
+
+	return nil
+}
+
+func (i *Importer) convertIfUpdated(link, dir, output string, pp *pp3.PP3, converted map[string]string, size int) (string, error) {
+	pp.ResizeLongest(size)
+	hash := pp.Hash()
 	output = fmt.Sprintf("%s.jpg", output)
 	rel, err := filepath.Rel(dir, output)
 	if err != nil {
@@ -41,22 +69,7 @@ func (i *Importer) convert(link, dir, output string, pp *pp3.PP3, converted map[
 	converted[rel] = hash
 
 	os.MkdirAll(filepath.Dir(output), 0755)
-
-	cmd := exec.Command(
-		"rawtherapee-cli",
-		"-Y",
-		"-o", output,
-		"-q",
-		"-p", pp3TempPath,
-		"-c", link,
-	)
-	buf := bytes.NewBuffer(nil)
-	cmd.Stderr = buf
-	cmd.Stdout = buf
-	if err := cmd.Run(); err != nil {
-		return rel, fmt.Errorf("%s: %s", err, buf)
-	}
-	return rel, nil
+	return rel, i.convert(link, output, pp)
 }
 
 func (i *Importer) Unedited(f *File) (bool, error) {
@@ -134,7 +147,7 @@ func (i *Importer) Convert(f *File, sizes []int, editedOnly bool) error {
 			ext := filepath.Ext(fn)
 			fn = fn[0 : len(fn)-len(ext)]
 			output := filepath.Join(dir, strconv.Itoa(s), fn)
-			rel, err := i.convert(links[n], i.convDir, output, pp3s[n], conv, s)
+			rel, err := i.convertIfUpdated(links[n], i.convDir, output, pp3s[n], conv, s)
 			if err != nil {
 				return err
 			}
