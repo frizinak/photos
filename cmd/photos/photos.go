@@ -93,7 +93,6 @@ func main() {
 - show-links     Show links (filter with -filter) (see -no-raw)
 - show-tags      Show all tags
 - info           Show info for given RAWs
-- update-meta    Rewrite .meta file (filter with -filter)
 - link           Create collection symlinks in the given directory (-collection)
 - previews       Generate simple jpeg previews (used by -actions rate)
 - rate           Simple opengl window to rate / trash images (filter with -filter)
@@ -414,13 +413,6 @@ e.g.: photos -base . -0 -actions show-jpegs -no-raw | xargs -0 feh`)
 
 				m.Tags = tags
 				return importer.SaveMeta(f, m)
-			})
-		},
-		"update-meta": func() {
-			l.Println("updating meta")
-			work(-1, func(f *importer.File) error {
-				_, err := importer.MakeMeta(f)
-				return err
 			})
 		},
 		"link": func() {
