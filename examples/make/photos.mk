@@ -67,6 +67,26 @@ gphotos:
 		ln -s "$$(realpath "$$line")" GPhotos/;\
 	done < <($(PHOTOS_CMD) -filter normal -actions show-jpegs -no-raw)
 
+## gvideos: converts videos with h264_nvenc (nvidia) to ./GVideos
+##          (easy to upload to google photos).
+.PHONY: gvideos
+gvideos:
+	@-mkdir GVideos >/dev/null 2>&1
+
+	while read line; do\
+		[[ "$$line" != *".MOV" ]] && continue;\
+		dst="GVideos/$$(basename "$$line" .MOV).mp4";\
+		[ -e "$$dst" ] && continue;\
+		tmp="$$dst.tmp";\
+		ffmpeg -loglevel warning \
+		-hwaccel:v auto -y \
+		-i "$$line" \
+		-c:a aac \
+		-c:v h264_nvenc -rc vbr -preset llhp -cq 30 \
+		-f mp4\
+		"$$tmp" </dev/null &&\
+		mv "$$tmp" "$$dst"; \
+	done < <($(PHOTOS_CMD) -filter normal -actions show-links -no-raw)
 
 ##
 ##
