@@ -18,29 +18,29 @@ help:
 
 ## sync: create/delete symlinks and update ratings/deleted flags.
 .PHONY: sync
-sync: cleanup
+sync:
 	$(PHOTOS_CMD) -filter all -actions link,sync-meta,link
 
 ## import: import photos using gphoto2 (camera or SD-card plugged in).
 .PHONY: import
-import: cleanup
+import:
 	$(PHOTOS_CMD) -filter all -actions import,link,sync-meta,link,previews
 
 ## rate: rate/delete unrated images and sync.
 .PHONY: rate
-rate: cleanup
+rate:
 	$(PHOTOS_CMD) -filter unrated -actions rate
 	$(PHOTOS_CMD) -filter all -actions link,sync-meta,link
 
 ## tag: tag/rate/delete untagged images and sync.
 .PHONY: tag
-tag: cleanup
+tag:
 	$(PHOTOS_CMD) -filter normal -actions rate -gt $(RatingGT) -tags '-'
 	$(PHOTOS_CMD) -filter all -actions link,sync-meta,link
 
 ## convert: convert all images where rating > $(RatingGT) to jpegs.
 .PHONY: convert
-convert: cleanup
+convert:
 	$(PHOTOS_CMD) -filter normal -gt $(RatingGT) -actions convert -sizes $(SIZES) -edited
 
 ## unedited: print list of links that should be edited in rawtherapee.
@@ -52,7 +52,8 @@ unedited:
 ##          jpegs of images with rating not > $(RatingGT).
 .PHONY: cleanup
 cleanup:
-	$(PHOTOS_CMD) -filter all -gt $(RatingGT) -actions cleanup -y
+	$(PHOTOS_CMD) -filter all -gt $(RatingGT) -actions sync-meta
+	$(PHOTOS_CMD) -filter all -gt $(RatingGT) -actions cleanup
 
 ## gphotos: create flat folder hierarchy of all converted jpegs
 ##          (easy to upload to google photos).
@@ -84,12 +85,12 @@ gphotos:
 
 ## import-quick: lightweight version of import.
 .PHONY: import-quick
-import-quick: cleanup
+import-quick:
 	$(PHOTOS_CMD) -filter all -actions import,link,sync-meta,link
 
 ## previews: generate previews. e.g.: when laptop is plugged in.
 .PHONY: previews
-previews: cleanup
+previews:
 	$(PHOTOS_CMD) -filter all -actions previews
 
 ## plugged: do all the heavy lifting at night

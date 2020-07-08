@@ -97,13 +97,15 @@ func main() {
 - link           Create collection symlinks in the given directory (-collection)
 - previews       Generate simple jpeg previews (used by -actions rate)
 - rate           Simple opengl window to rate / trash images (filter with -filter)
-- sync-meta      Sync .meta file with .pp3 (file mtime determines which one is the authority)
+- sync-meta      Sync .meta file with .pp3 (file mtime determines which one is the authority) and filesystem
 - convert        Convert images to jpegs to the given directory (-jpegs) and sizes (-sizes) (filter with -filter and -edited)
 - exec           Run an external command for each file (first non flag and any further arguments, {} is replaced with the filepath)
                  e.g.: photos -base . -actions exec -filter all wc -c {}
 - cleanup        Remove pp3s and jpegs for deleted RAWs
                  -filter and -lt are ignored
 				 Images whose rating is not higher than -gt will also have their jpegs deleted.
+				 !Note: .meta files are seen as the single source of truth, so run sync-meta before.
+
 - remove-tags    Remove tags (first non flag argument are the tags that will be removed)
 - add-tags       Add tag (first non flag argument are the tags that will be removed)
 `)
