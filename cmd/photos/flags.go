@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/frizinak/photos/importer"
 	"github.com/frizinak/photos/meta"
@@ -25,11 +26,39 @@ func (i *flagStrs) Set(value string) error {
 	return nil
 }
 
+var timeFormats = []string{
+	"2006-01-02 15:04",
+	"2006-01-02",
+}
+
+func parseTime(str string) (*time.Time, error) {
+	if str == "" {
+		return nil, nil
+	}
+
+	var t time.Time
+	var err error
+	for i, f := range timeFormats {
+		t, err = time.ParseInLocation(f, str, time.Local)
+		if err == nil {
+			if i != 0 {
+				y, m, d := t.Date()
+				t = time.Date(y, m, d+1, 0, 0, 0, 0, time.Local)
+			}
+			return &t, nil
+		}
+	}
+
+	return nil, err
+}
+
 const (
 	FlagActions            = "action"
 	FlagFilters            = "filter"
 	FlagGT                 = "gt"
 	FlagLT                 = "lt"
+	FlagSince              = "since"
+	FlagUntil              = "until"
 	FlagTags               = "tag"
 	FlagChecksum           = "sum"
 	FlagSizes              = "sizes"
@@ -179,8 +208,10 @@ var lists = Lists{
 		},
 	},
 
-	FlagGT: {help: "[any] additional greater than given rating filter"},
-	FlagLT: {help: "[any] additional less than given rating filter"},
+	FlagGT:    {help: "[any] additional greater than given rating filter"},
+	FlagLT:    {help: "[any] additional less than given rating filter"},
+	FlagSince: {help: "[any] additional since time filter [Y-m-d (H:M)]"},
+	FlagUntil: {help: "[any] additional until time filter [Y-m-d (H:M)]"},
 	FlagTags: {
 		help: `[any] additional tag filter, comma separated <or> can be specified multiple times <and>, ^ to negate a single tag
 e.g:
@@ -224,6 +255,10 @@ type Flags struct {
 	tags    []map[string]struct{}
 	rating  struct {
 		gt, lt int
+	}
+
+	time struct {
+		since, until *time.Time
 	}
 
 	rawDir, collectionDir, jpegDir string
@@ -339,6 +374,14 @@ func (f *Flags) Filter(imp *importer.Importer) Filter {
 				}
 			}
 
+			if f.time.since != nil && f.time.since.After(m.CreatedTime()) {
+				return false
+			}
+
+			if f.time.until != nil && f.time.until.Before(m.CreatedTime()) {
+				return false
+			}
+
 			tmap := m.Tags.Map()
 			for _, and := range f.tags {
 				match := false
@@ -400,9 +443,7 @@ func (f *Flags) Parse() {
 	var ratingGTFilter int
 	var ratingLTFilter int
 	var baseDir string
-	var rawDir string
-	var collectionDir string
-	var jpegDir string
+	var rawDir, collectionDir, jpegDir string
 	var fsSources flagStrs
 	var checksum bool
 	var sizes flagStrs
@@ -412,11 +453,15 @@ func (f *Flags) Parse() {
 	var noRawPrefix bool
 	var tags flagStrs
 	var gphotos string
+	var since, until string
 
 	f.fs.Var(&actions, FlagActions, f.lists.Help(FlagActions))
 	f.fs.Var(&filters, FlagFilters, f.lists.Help(FlagFilters))
 	f.fs.IntVar(&ratingGTFilter, FlagGT, -1, f.lists.Help(FlagGT))
 	f.fs.IntVar(&ratingLTFilter, FlagLT, 6, f.lists.Help(FlagLT))
+	f.fs.StringVar(&since, FlagSince, "", f.lists.Help(FlagSince))
+	f.fs.StringVar(&until, FlagUntil, "", f.lists.Help(FlagUntil))
+
 	f.fs.Var(&tags, FlagTags, f.lists.Help(FlagTags))
 
 	f.fs.BoolVar(&checksum, FlagChecksum, false, f.lists.Help(FlagChecksum))
@@ -504,6 +549,11 @@ func (f *Flags) Parse() {
 			f.tags = append(f.tags, ors)
 		}
 	}
+
+	f.time.since, err = parseTime(since)
+	f.Err(err)
+	f.time.until, err = parseTime(until)
+	f.Err(err)
 
 	f.sourceDirs = fsSources
 	f.rating.gt = ratingGTFilter
