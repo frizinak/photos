@@ -24,6 +24,32 @@ import (
 	"github.com/frizinak/photos/rate"
 )
 
+type FileMeta struct {
+	d time.Time
+	m *meta.Meta
+	f *importer.File
+}
+
+type FileMetas []*FileMeta
+
+func (f FileMetas) Len() int           { return len(f) }
+func (f FileMetas) Swap(i, j int)      { f[i], f[j] = f[j], f[i] }
+func (f FileMetas) Less(i, j int) bool { return f[i].d.Before(f[j].d) }
+
+func combine(files importer.Files) (FileMetas, error) {
+	m := make(FileMetas, len(files))
+	for i, f := range files {
+		met, err := importer.GetMeta(f)
+		if err != nil {
+			return nil, err
+		}
+
+		m[i] = &FileMeta{met.CreatedTime(), &met, f}
+	}
+
+	return m, nil
+}
+
 func ask() string {
 	sc := bufio.NewScanner(os.Stdin)
 	sc.Split(bufio.ScanLines)
@@ -89,6 +115,13 @@ func main() {
 		return l
 	}
 
+	allMeta := func() FileMetas {
+		all := allList()
+		l, err := combine(all)
+		flag.Exit(err)
+		return l
+	}
+
 	_work := func(counted bool) func(int, func(*importer.File) error) {
 		return func(workers int, do func(*importer.File) error) {
 			if workers < 1 {
@@ -125,7 +158,6 @@ func main() {
 			})
 			close(work)
 			wg.Wait()
-
 		}
 	}
 
@@ -152,37 +184,33 @@ func main() {
 			})
 		},
 		ActionShowJPEGs: func() {
-			all(func(f *importer.File) (bool, error) {
-				m, err := importer.GetMeta(f)
-				if err != nil {
-					return false, err
-				}
-				for jpg := range m.Converted {
+			list := allMeta()
+			sort.Sort(list)
+			for _, f := range list {
+				for jpg := range f.m.Converted {
 					p := filepath.Join(flag.JPEGDir(), jpg)
 					if flag.NoRawPrefix() {
 						flag.Output(p)
 						continue
 					}
-					flag.Output(fmt.Sprintf("%s: %s", f.Path(), p))
+					flag.Output(fmt.Sprintf("%s: %s", f.f.Path(), p))
 				}
-				return true, nil
-			})
+			}
 		},
 		ActionShowLinks: func() {
-			all(func(f *importer.File) (bool, error) {
-				links, err := imp.FindLinks(f)
-				if err != nil {
-					return false, err
-				}
+			list := allMeta()
+			sort.Sort(list)
+			for _, f := range list {
+				links, err := imp.FindLinks(f.f)
+				flag.Exit(err)
 				for _, l := range links {
 					if flag.NoRawPrefix() {
 						flag.Output(l)
 						continue
 					}
-					flag.Output(fmt.Sprintf("%s: %s", f.Path(), l))
+					flag.Output(fmt.Sprintf("%s: %s", f.f.Path(), l))
 				}
-				return true, nil
-			})
+			}
 		},
 		ActionShowTags: func() {
 			tags := make(meta.Tags, 0)
