@@ -10,13 +10,17 @@ import (
 
 type Tags []string
 
-func (t Tags) Unique() Tags {
+func (t Tags) Map() map[string]struct{} {
 	tm := make(map[string]struct{}, len(t))
 	for _, tag := range t {
 		tm[tag] = struct{}{}
 	}
+	return tm
+}
+
+func (t Tags) Unique() Tags {
 	nt := make(Tags, 0, len(t))
-	for i := range tm {
+	for i := range t.Map() {
 		nt = append(nt, i)
 	}
 	sort.Strings(nt)

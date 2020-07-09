@@ -2,10 +2,10 @@
 
 ## Dependencies
 
-- imagemagick         (`-actions previews`)
-- gphoto2             (`-actions import`)
-- ffmpeg for .MOVs    (`-actions import`, currently only uses ffprobe for metadata)
-- rawtherapee         (`-actions convert`)
+- imagemagick         (`-action previews` if rawtherapee not in PATH)
+- gphoto2             (`-action import`)
+- ffmpeg for .MOVs    (`-action import`, currently only uses ffprobe for metadata)
+- rawtherapee         (`-action convert`)
 
 ## What it does
 
@@ -13,7 +13,7 @@
 2. Symlinks those raws to `-collection` in an opinionated directory hierarchy
 3. At this point you can:
     - rename and/or move any of those symlink (as long as the symlink stays intact and remains a descendant of `-collection`)
-    - review em using the builtin rating application `-actions rate`
+    - review em using the builtin rating application `-action rate`
     - edit the raws in `-collection` with rawtherapee
 4. Ratings and deleted/trash flag will be synced between all symlinks of a given raw
 5. Convert images to jpegs using the rawtherapee.pp3 sidecar file and store em in `-jpegs` using the same directory hierarchy as the one we/you have created in `-collection`
@@ -21,6 +21,8 @@
 ## Usage
 
 `photos -h`
+
+also see the examples in repo
 
 ### required flags:
 
@@ -42,20 +44,20 @@ which defaults to
 - Check symlinks again in case a metadata file indicated a delete.
 - Generate previews.
 
-`photos -base my_library -actions import,link,sync-meta,link,previews -filter all`
+`photos -base my_library -action import,link,sync-meta,link,previews
 
 - Rate images.
 - Sync metadata to rawtherapees .pp3 files.
 
-`photos -base my_library -actions rate,sync-meta,link -filter unrated`
+`photos -base my_library -action rate,sync-meta,link -filter unrated`
 
 - Remove converted images and pp3s whose RAWs have been deleted and/or those with a low rating.
 
-`photos -base my_library -actions cleanup -gt 2`
+`photos -base my_library -action cleanup -gt 2`
 
 - Convert images with a rating > 2 and have been opened in rawtherapee (-edited) to jpegs
 
-`photos -base my_library -actions convert -sizes 3840,1920,800 -filter normal -gt 2 -edited`
+`photos -base my_library -action convert -sizes 3840,1920,800 -filter undeleted,edited -gt 2
 
 - Merge library `two` onto `one`
 
@@ -63,5 +65,4 @@ which defaults to
 
 ## Install
 
-`go get github.com/frizinak/photos/cmd/photos`
-
+`go get -u github.com/frizinak/photos/cmd/photos`

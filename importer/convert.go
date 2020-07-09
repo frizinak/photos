@@ -98,7 +98,7 @@ func pp3Edited(pp *pp3.PP3) bool {
 	return pp.Has("Exposure", "Compensation")
 }
 
-func (i *Importer) Convert(f *File, sizes []int, editedOnly bool) error {
+func (i *Importer) Convert(f *File, sizes []int) error {
 	links := []string{}
 	pp3s := []*pp3.PP3{}
 	err := i.walkLinks(f, func(link string) (bool, error) {
@@ -108,10 +108,6 @@ func (i *Importer) Convert(f *File, sizes []int, editedOnly bool) error {
 				return true, nil
 			}
 			return false, err
-		}
-
-		if editedOnly && !pp3Edited(pp3) {
-			return true, nil
 		}
 
 		pp3s = append(pp3s, pp3)
