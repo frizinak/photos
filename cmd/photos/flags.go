@@ -26,22 +26,23 @@ func (i *flagStrs) Set(value string) error {
 }
 
 const (
-	FlagActions       = "action"
-	FlagFilters       = "filter"
-	FlagGT            = "gt"
-	FlagLT            = "lt"
-	FlagTags          = "tag"
-	FlagChecksum      = "sum"
-	FlagSizes         = "sizes"
-	FlagRawDir        = "raws"
-	FlagCollectionDir = "collection"
-	FlagJPEGDir       = "jpegs"
-	FlagMaxWorkers    = "workers"
-	FlagBaseDir       = "base"
-	FlagSourceDir     = "source"
-	FlagAlwaysYes     = "y"
-	FlagZero          = "0"
-	FlagNoRawPrefix   = "no-raw"
+	FlagActions            = "action"
+	FlagFilters            = "filter"
+	FlagGT                 = "gt"
+	FlagLT                 = "lt"
+	FlagTags               = "tag"
+	FlagChecksum           = "sum"
+	FlagSizes              = "sizes"
+	FlagRawDir             = "raws"
+	FlagCollectionDir      = "collection"
+	FlagJPEGDir            = "jpegs"
+	FlagMaxWorkers         = "workers"
+	FlagBaseDir            = "base"
+	FlagSourceDir          = "source"
+	FlagAlwaysYes          = "y"
+	FlagZero               = "0"
+	FlagNoRawPrefix        = "no-raw"
+	FlagGPhotosCredentials = "gphotos"
 )
 
 const (
@@ -60,6 +61,7 @@ const (
 	ActionCleanup    = "cleanup"
 	ActionTagsRemove = "remove-tags"
 	ActionTagsAdd    = "add-tags"
+	ActionGPhotos    = "gphotos"
 
 	FilterUndeleted = "undeleted"
 	FilterDeleted   = "deleted"
@@ -86,6 +88,7 @@ var (
 		ActionCleanup:    struct{}{},
 		ActionTagsRemove: struct{}{},
 		ActionTagsAdd:    struct{}{},
+		ActionGPhotos:    struct{}{},
 	}
 
 	allFilters = map[string]struct{}{
@@ -161,6 +164,7 @@ var lists = Lists{
 			},
 			ActionTagsRemove: {"Remove tags (first non flag argument are the tags that will be removed)"},
 			ActionTagsAdd:    {"Add tag (first non flag argument are the tags that will be removed)"},
+			ActionGPhotos:    {"Upload converted photos to google photos"},
 		},
 	},
 
@@ -198,7 +202,9 @@ special case: '*' only matches files with tags
 -raws (if not given)       = <basedir>/Originals
 -collection (if not given) = <basedir>/Collection
 -jpegs (if not given)      = <basedir>/Converted
+-gphotos (if not given)    = <basedir>/gphotos.credentials
 `},
+	FlagGPhotosCredentials: {help: "[gphotos] path to the google credentials file"},
 
 	FlagMaxWorkers: {help: "[all] maximum amount of threads"},
 	FlagSourceDir:  {help: "[import] filesystem paths to import from, can be specified multiple times"},
@@ -234,6 +240,8 @@ type Flags struct {
 	zero        bool
 
 	maxWorkers int
+
+	gphotos string
 
 	output func(string)
 	filter Filter
@@ -276,6 +284,8 @@ func (f *Flags) Sizes() []int { return f.sizes }
 
 func (f *Flags) RatingGT() int { return f.rating.gt }
 func (f *Flags) RatingLT() int { return f.rating.lt }
+
+func (f *Flags) GPhotosCredentials() string { return f.gphotos }
 
 func (f *Flags) Filter(imp *importer.Importer) Filter {
 	if f.filter == nil {
@@ -401,6 +411,7 @@ func (f *Flags) Parse() {
 	var maxWorkers int
 	var noRawPrefix bool
 	var tags flagStrs
+	var gphotos string
 
 	f.fs.Var(&actions, FlagActions, f.lists.Help(FlagActions))
 	f.fs.Var(&filters, FlagFilters, f.lists.Help(FlagFilters))
@@ -414,6 +425,8 @@ func (f *Flags) Parse() {
 	f.fs.StringVar(&rawDir, FlagRawDir, "", f.lists.Help(FlagRawDir))
 	f.fs.StringVar(&collectionDir, FlagCollectionDir, "", f.lists.Help(FlagCollectionDir))
 	f.fs.StringVar(&jpegDir, FlagJPEGDir, "", f.lists.Help(FlagJPEGDir))
+
+	f.fs.StringVar(&gphotos, FlagGPhotosCredentials, "", f.lists.Help(FlagGPhotosCredentials))
 
 	f.fs.IntVar(&maxWorkers, FlagMaxWorkers, 100, f.lists.Help(FlagMaxWorkers))
 
@@ -454,6 +467,9 @@ func (f *Flags) Parse() {
 		}
 		if jpegDir == "" {
 			jpegDir = filepath.Join(baseDir, "Converted")
+		}
+		if gphotos == "" {
+			gphotos = filepath.Join(baseDir, "gphotos.credentials")
 		}
 	}
 
@@ -498,4 +514,5 @@ func (f *Flags) Parse() {
 	f.zero = zero
 	f.maxWorkers = maxWorkers
 	f.rawDir, f.collectionDir, f.jpegDir = rawDir, collectionDir, jpegDir
+	f.gphotos = gphotos
 }

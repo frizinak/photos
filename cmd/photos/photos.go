@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/frizinak/photos/gphotos"
 	"github.com/frizinak/photos/importer"
 	"github.com/frizinak/photos/importer/fs"
 	_ "github.com/frizinak/photos/importer/gphoto2"
@@ -43,9 +44,9 @@ func commaSep(v string) []string {
 }
 
 func main() {
+	l := log.New(os.Stderr, "", log.LstdFlags)
 	flag := NewFlags()
 	flag.Parse()
-	l := log.New(os.Stderr, "", log.LstdFlags)
 	imp := importer.New(l, flag.RawDir(), flag.CollectionDir(), flag.JPEGDir())
 
 	var filter func(f *importer.File) bool
@@ -459,6 +460,21 @@ Date: %s
 
 			close(results)
 			<-done
+		},
+		ActionGPhotos: func() {
+			creds := flag.GPhotosCredentials()
+			if creds == "" {
+				flag.Exit(errors.New("no gphotos credentials file specified"))
+			}
+
+			gp := gphotos.New(
+				l,
+				"530510971074-t9kso4357tel77so65eges36nd721763.apps.googleusercontent.com",
+				"Bc8Stv2Han1jUgm0VRS9JPNa",
+				creds,
+			)
+
+			flag.Exit(gp.Authenticate())
 		},
 	}
 
