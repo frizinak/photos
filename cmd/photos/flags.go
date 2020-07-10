@@ -31,7 +31,7 @@ var timeFormats = []string{
 	"2006-01-02",
 }
 
-func parseTime(str string) (*time.Time, error) {
+func parseTime(str string, eod bool) (*time.Time, error) {
 	if str == "" {
 		return nil, nil
 	}
@@ -41,7 +41,7 @@ func parseTime(str string) (*time.Time, error) {
 	for i, f := range timeFormats {
 		t, err = time.ParseInLocation(f, str, time.Local)
 		if err == nil {
-			if i != 0 {
+			if i != 0 && eod {
 				y, m, d := t.Date()
 				t = time.Date(y, m, d+1, 0, 0, 0, 0, time.Local)
 			}
@@ -550,9 +550,9 @@ func (f *Flags) Parse() {
 		}
 	}
 
-	f.time.since, err = parseTime(since)
+	f.time.since, err = parseTime(since, false)
 	f.Err(err)
-	f.time.until, err = parseTime(until)
+	f.time.until, err = parseTime(until, true)
 	f.Err(err)
 
 	f.sourceDirs = fsSources
