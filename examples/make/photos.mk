@@ -55,17 +55,20 @@ cleanup:
 	$(PHOTOS_CMD) -gt $(RatingGT) -action sync-meta
 	$(PHOTOS_CMD) -gt $(RatingGT) -action cleanup
 
-## gphotos: create flat folder hierarchy of all converted jpegs
-##          (easy to upload to google photos).
-.PHONY: gphotos
-gphotos:
-	rm -rf GPhotos
-	mkdir GPhotos
+## flat: create flat folder hierarchy of all converted jpegs
+.PHONY: flat
+flat:
+	rm -rf Flat
+	mkdir Flat
 
 	while read line; do\
-		[[ $$line != *"/$(GPhotoSize)/"* ]] && continue;\
-		ln -s "$$(realpath "$$line")" GPhotos/;\
-	done < <($(PHOTOS_CMD) -filter undeleted -gt $(RatingGT) -action show-jpegs -no-raw)
+		ln -s "$$(realpath "$$line")" Flat/;\
+	done < <($(PHOTOS_CMD) -filter undeleted -gt $(RatingGT) -action show-jpegs -no-raw -size $(FlatSize))
+
+## gphotos: upload jpegs taken today to google photos
+.PHONY: gphotos
+gphotos:
+	$(PHOTOS_CMD) -filter undeleted -gt $(RatingGT) -action gphotos -sizes $(GPhotoSize) -since $$(date +%Y-%m-%d)
 
 ## gvideos: converts videos with h264_nvenc (nvidia) to ./GVideos
 ##          (easy to upload to google photos).
