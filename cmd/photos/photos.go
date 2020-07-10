@@ -104,7 +104,6 @@ func main() {
 		l := make(importer.Files, 0, 100)
 		flag.Exit(
 			imp.All(func(f *importer.File) (bool, error) {
-
 				if !filter(f) {
 					return true, nil
 				}
@@ -186,8 +185,18 @@ func main() {
 		ActionShowJPEGs: func() {
 			list := allMeta()
 			sort.Sort(list)
+			sizes := flag.Sizes()
+			smap := make(map[int]struct{}, len(sizes))
+			for _, s := range sizes {
+				smap[s] = struct{}{}
+			}
 			for _, f := range list {
-				for jpg := range f.m.Converted {
+				for jpg, conv := range f.m.Conv {
+					if len(sizes) != 0 {
+						if _, ok := smap[conv.Size]; !ok {
+							continue
+						}
+					}
 					p := filepath.Join(flag.JPEGDir(), jpg)
 					if flag.NoRawPrefix() {
 						flag.Output(p)
@@ -402,8 +411,8 @@ func main() {
 					l = "Link[]:"
 				}
 
-				converted := make([]string, 0, len(info.m.Converted))
-				for i := range info.m.Converted {
+				converted := make([]string, 0, len(info.m.Conv))
+				for i := range info.m.Conv {
 					p, err := filepath.Abs(filepath.Join(flag.JPEGDir(), i))
 					flag.Exit(err)
 					converted = append(converted, fmt.Sprintf("Converted[]: %s", p))

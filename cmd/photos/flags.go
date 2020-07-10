@@ -224,7 +224,15 @@ special case: '*' only matches files with tags
 	},
 
 	FlagChecksum: {help: "[import] dry-run and report non-identical files with duplicate filenames"},
-	FlagSizes:    {help: "[convert] longest image dimension will be scaled to this size (comma separated and/or specified multiple times (e.g.: 3840,1920,800)"},
+	FlagSizes: {
+		help: "comma separated and/or specified multiple times (e.g.: 3840,1920,800)",
+		list: map[string][]string{
+			"[convert]": {
+				"longest image dimension will be scaled to this size ",
+			},
+			"[show-jpegs]": {"filter on jpeg sizes"},
+		},
+	},
 
 	FlagRawDir:        {help: "[any] Raw directory"},
 	FlagCollectionDir: {help: "[any] Collection directory"},

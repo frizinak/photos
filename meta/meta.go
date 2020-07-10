@@ -27,6 +27,11 @@ func (t Tags) Unique() Tags {
 	return nt
 }
 
+type Converted struct {
+	Hash string
+	Size int
+}
+
 type Meta struct {
 	Checksum     string
 	Size         int64
@@ -37,8 +42,8 @@ type Meta struct {
 	Deleted bool
 	Rating  int
 
-	PP3       []string
-	Converted map[string]string
+	PP3  []string
+	Conv map[string]Converted
 
 	Tags Tags
 }

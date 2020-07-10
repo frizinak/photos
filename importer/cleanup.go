@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/frizinak/photos/meta"
 )
 
 func rmEmpty(dir string) (bool, error) {
@@ -75,27 +77,27 @@ func (i *Importer) Cleanup(minRating int) ([]string, error) {
 	pp3 := make(map[string]struct{}, len(all))
 
 	for _, f := range all {
-		meta, err := GetMeta(f)
+		m, err := GetMeta(f)
 		if err != nil {
 			return nil, err
 		}
 
-		if (meta.Deleted || meta.Rating <= minRating) && len(meta.Converted) != 0 {
-			meta.Converted = make(map[string]string)
-			if err = SaveMeta(f, meta); err != nil {
+		if (m.Deleted || m.Rating <= minRating) && len(m.Conv) != 0 {
+			m.Conv = make(map[string]meta.Converted)
+			if err = SaveMeta(f, m); err != nil {
 				return nil, err
 			}
 		}
 
-		if meta.Deleted {
+		if m.Deleted {
 			continue
 		}
 
-		for n := range meta.Converted {
+		for n := range m.Conv {
 			converted[n] = struct{}{}
 		}
 
-		for _, n := range meta.PP3 {
+		for _, n := range m.PP3 {
 			pp3[n] = struct{}{}
 		}
 	}

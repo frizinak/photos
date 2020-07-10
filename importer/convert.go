@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/frizinak/photos/meta"
 	"github.com/frizinak/photos/pp3"
 )
 
@@ -33,9 +34,11 @@ func (i *Importer) convert(input, output string, pp *pp3.PP3) error {
 		"-p", pp3TempPath,
 		"-c", input,
 	)
+
 	buf := bytes.NewBuffer(nil)
 	cmd.Stderr = buf
 	if err := cmd.Run(); err != nil {
+		os.Remove(tmp)
 		return fmt.Errorf("%s: %s", err, buf)
 	}
 
@@ -46,7 +49,7 @@ func (i *Importer) convert(input, output string, pp *pp3.PP3) error {
 	return nil
 }
 
-func (i *Importer) convertIfUpdated(link, dir, output string, pp *pp3.PP3, converted map[string]string, size int) (string, error) {
+func (i *Importer) convertIfUpdated(link, dir, output string, pp *pp3.PP3, converted map[string]meta.Converted, size int) (string, error) {
 	pp.ResizeLongest(size)
 	hash := pp.Hash()
 	output = fmt.Sprintf("%s.jpg", output)
@@ -63,10 +66,10 @@ func (i *Importer) convertIfUpdated(link, dir, output string, pp *pp3.PP3, conve
 		return rel, err
 	}
 
-	if h, ok := converted[rel]; exists && ok && h == hash {
+	if h, ok := converted[rel]; exists && ok && h.Hash == hash {
 		return rel, nil
 	}
-	converted[rel] = hash
+	converted[rel] = meta.Converted{Hash: hash, Size: size}
 
 	os.MkdirAll(filepath.Dir(output), 0755)
 	return rel, i.convert(link, output, pp)
@@ -122,14 +125,14 @@ func (i *Importer) Convert(f *File, sizes []int) error {
 		return nil
 	}
 
-	meta, err := GetMeta(f)
+	m, err := GetMeta(f)
 	if err != nil {
 		return err
 	}
 	for n, link := range links {
-		conv := meta.Converted
+		conv := m.Conv
 		if conv == nil {
-			conv = make(map[string]string)
+			conv = make(map[string]meta.Converted)
 		}
 		rels := make(map[string]struct{}, len(conv))
 		for _, s := range sizes {
@@ -156,8 +159,8 @@ func (i *Importer) Convert(f *File, sizes []int) error {
 			}
 		}
 
-		meta.Converted = conv
+		m.Conv = conv
 	}
 
-	return SaveMeta(f, meta)
+	return SaveMeta(f, m)
 }
