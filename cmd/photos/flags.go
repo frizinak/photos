@@ -454,7 +454,9 @@ func (f *Flags) Parse() {
 	var tags flagStrs
 	var gphotos string
 	var since, until string
+	var help bool
 
+	f.fs.BoolVar(&help, "h", false, "help")
 	f.fs.Var(&actions, FlagActions, f.lists.Help(FlagActions))
 	f.fs.Var(&filters, FlagFilters, f.lists.Help(FlagFilters))
 	f.fs.IntVar(&ratingGTFilter, FlagGT, -1, f.lists.Help(FlagGT))
@@ -484,6 +486,11 @@ func (f *Flags) Parse() {
 	f.fs.BoolVar(&noRawPrefix, FlagNoRawPrefix, false, f.lists.Help(FlagNoRawPrefix))
 
 	f.Err(f.fs.Parse(os.Args[1:]))
+
+	if help {
+		f.fs.PrintDefaults()
+		os.Exit(0)
+	}
 
 	f.actions = commaSep(strings.Join(actions, ","))
 	if len(f.actions) == 0 {
