@@ -129,7 +129,12 @@ outer:
 		case pf(s, "Exif."):
 			fallthrough
 		case pf(s, "IPTC."):
-			v, err := pp.Key("MetaData", "Mode").Int()
+			k := pp.Key("MetaData", "Mode")
+			if k.Value() == "" {
+				pp.ini.Section("MetaData").DeleteKey("Mode")
+				continue outer
+			}
+			v, err := k.Int()
 			if err == nil && v != 1 {
 				continue outer
 			}
