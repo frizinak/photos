@@ -1,4 +1,5 @@
-# RAW Photo library manager
+[photos: RAW Photo library manager](https://github.com/frizinak/photos)
+===
 
 ## Dependencies
 
