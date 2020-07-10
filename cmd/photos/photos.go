@@ -3,6 +3,10 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -499,19 +503,59 @@ Date: %s
 			<-done
 		},
 		ActionGPhotos: func() {
+			sizes := flag.Sizes()
+			if len(sizes) == 0 {
+				flag.Exit(errors.New("please specify all sizes that should be uploaded"))
+			}
+			smap := make(map[int]struct{}, len(sizes))
+			for _, s := range sizes {
+				smap[s] = struct{}{}
+			}
+
 			creds := flag.GPhotosCredentials()
 			if creds == "" {
 				flag.Exit(errors.New("no gphotos credentials file specified"))
 			}
 
+			l.Println("assembling files")
+			var sem sync.Mutex
+			list := make([]gphotos.UploadTask, 0)
+			work(100, func(f *importer.File) error {
+				m, err := importer.GetMeta(f)
+				if err != nil {
+					return err
+				}
+				for jpg, conv := range m.Conv {
+					if _, ok := smap[conv.Size]; !ok {
+						continue
+					}
+					p := filepath.Join(flag.JPEGDir(), jpg)
+					sem.Lock()
+					list = append(list, gphotos.NewFileUploadTask(p, "withapi"))
+					sem.Unlock()
+				}
+				return nil
+			})
+
+			if len(list) == 0 {
+				l.Println("no files to upload")
+				return
+			}
+
 			gp := gphotos.New(
 				l,
-				"530510971074-t9kso4357tel77so65eges36nd721763.apps.googleusercontent.com",
-				"Bc8Stv2Han1jUgm0VRS9JPNa",
+				"530510971074-tdam4676hpg5u82vh8jb1mka23jb06hc.apps.googleusercontent.com",
+				secbyobflol("9c24d41fa1de5c7d855223b5640447ee665797b196d11b8575c59e6a507e3fc70053b408ff9bb0a70718e8c54c89e46754167b28878878719fc2a00ea38ffa45ff3e587fcdca63b2f431ed94590581f366ed102d9afa7267a3d6c9628c075466766d65b837a4e6acf5fe432833c9ce05a9"),
 				creds,
 			)
 
-			flag.Exit(gp.Authenticate())
+			flag.Exit(gp.Authenticate(true))
+			l.Println("uploading")
+			flag.Exit(gp.BatchUpload(8, list, func(n, total int32) {
+				fmt.Fprintf(os.Stderr, "\033[K\r%4d/%-4d ", n, total)
+			}))
+			fmt.Fprintln(os.Stderr)
+			l.Println("done")
 		},
 	}
 
@@ -530,4 +574,19 @@ Date: %s
 
 		cmds[action]()
 	}
+}
+
+func secbyobflol(in string) string {
+	b := base64.StdEncoding
+	r, _ := hex.DecodeString(in)
+	k, t, i, p := r[0:32], int(r[32]), r[33:33+aes.BlockSize], r[33+aes.BlockSize:]
+	bl, _ := aes.NewCipher(k)
+	d := make([]byte, len(p))
+	cipher.NewCBCDecrypter(bl, i).CryptBlocks(d, p)
+	d = d[:len(d)-t]
+	a := make([]byte, b.DecodedLen(len(d)))
+	t, _ = b.Decode(a, d)
+	h := make([]byte, hex.DecodedLen(t))
+	hex.Decode(h, a[:t])
+	return string(h)
 }

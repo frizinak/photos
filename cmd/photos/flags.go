@@ -231,6 +231,7 @@ special case: '*' only matches files with tags
 				"longest image dimension will be scaled to this size ",
 			},
 			"[show-jpegs]": {"filter on jpeg sizes"},
+			"[gphotos]":    {"filter on jpeg sizes"},
 		},
 	},
 

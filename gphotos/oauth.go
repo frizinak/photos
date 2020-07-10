@@ -20,7 +20,7 @@ const (
 	EndpointToken = "https://oauth2.googleapis.com/token"
 )
 
-func (g *GPhotos) GenCodeVerifier() ([]byte, error) {
+func (g *GPhotos) genCodeVerifier() ([]byte, error) {
 	v, err := codeVerifier(g.state.codeVerifierLength)
 	if err != nil {
 		return nil, err
@@ -29,7 +29,7 @@ func (g *GPhotos) GenCodeVerifier() ([]byte, error) {
 	return g.state.codeVerifier, nil
 }
 
-func (g *GPhotos) CodeVerifier() ([]byte, error) {
+func (g *GPhotos) codeVerifier() ([]byte, error) {
 	if len(g.state.codeVerifier) != g.state.codeVerifierLength {
 		return nil, errors.New("no code verifier generated")
 	}
@@ -37,7 +37,7 @@ func (g *GPhotos) CodeVerifier() ([]byte, error) {
 }
 
 func (g *GPhotos) Auth(scopes []string) (string, error) {
-	codeVerifier, err := g.GenCodeVerifier()
+	codeVerifier, err := g.genCodeVerifier()
 	if err != nil {
 		return "", err
 	}
@@ -112,49 +112,39 @@ type Token struct {
 }
 
 func (g *GPhotos) Token(code string) error {
-	codeVerifier, err := g.CodeVerifier()
+	codeVerifier, err := g.codeVerifier()
 	if err != nil {
 		return err
 	}
 
-	u, err := url.Parse(EndpointToken)
-	if err != nil {
-		return err
-	}
-
-	q := u.Query()
+	q := url.Values{}
 	q.Set("client_id", g.id)
 	q.Set("client_secret", g.secret)
 	q.Set("code", code)
 	q.Set("code_verifier", string(codeVerifier))
 	q.Set("grant_type", "authorization_code")
 	q.Set("redirect_uri", g.state.redirect)
-	u.RawQuery = q.Encode()
 
-	req, err := http.NewRequest("POST", u.String(), nil)
+	req, err := http.NewRequest("POST", EndpointToken, strings.NewReader(q.Encode()))
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return g.token(req)
 }
 
 func (g *GPhotos) Refresh() error {
-	u, err := url.Parse(EndpointToken)
-	if err != nil {
-		return err
-	}
-
-	q := u.Query()
+	q := url.Values{}
 	q.Set("client_id", g.id)
 	q.Set("client_secret", g.secret)
 	q.Set("refresh_token", g.t.Refresh)
 	q.Set("grant_type", "refresh_token")
-	u.RawQuery = q.Encode()
 
-	req, err := http.NewRequest("POST", u.String(), nil)
+	req, err := http.NewRequest("POST", EndpointToken, strings.NewReader(q.Encode()))
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return g.token(req)
 }
 
@@ -177,8 +167,13 @@ func (g *GPhotos) token(req *http.Request) error {
 	return nil
 }
 
-func (g *GPhotos) AuthHeader(h http.Header) {
+func (g *GPhotos) AuthHeader(h http.Header) error {
+	if err := g.Authenticate(false); err != nil {
+		return err
+	}
+
 	h.Set("Authorization", fmt.Sprintf("Bearer %s", g.t.Access))
+	return nil
 }
 
 func (g *GPhotos) decode(r io.ReadCloser) (Token, error) {
@@ -192,9 +187,13 @@ func (g *GPhotos) decode(r io.ReadCloser) (Token, error) {
 	return t, err
 }
 
-func (g *GPhotos) Authenticate() error {
-	if err := g.ensureToken(); err != nil {
+func (g *GPhotos) Authenticate(interactive bool) error {
+	isNew, err := g.ensureToken(interactive)
+	if err != nil {
 		return err
+	}
+	if !isNew {
+		return nil
 	}
 
 	f, err := os.OpenFile(g.cache, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
@@ -205,18 +204,28 @@ func (g *GPhotos) Authenticate() error {
 	return json.NewEncoder(f).Encode(g.t)
 }
 
-func (g *GPhotos) ensureToken() error {
+func (g *GPhotos) ensureToken(interactive bool) (bool, error) {
+	g.sem.Lock()
+	defer g.sem.Unlock()
+	if g.t.Access != "" && g.t.Expires.Add(-5*time.Minute).After(time.Now()) {
+		return false, nil
+	}
+
 	f, err := os.Open(g.cache)
 	if err == nil {
 		g.t, _ = g.decode(f)
 	}
 
-	if g.t.Access != "" && g.t.Expires.Add(-time.Minute).After(time.Now()) {
-		return nil
+	if g.t.Access != "" && g.t.Expires.Add(-5*time.Minute).After(time.Now()) {
+		return false, nil
 	}
 
 	if g.t.Refresh != "" {
-		return g.Refresh()
+		return true, g.Refresh()
+	}
+
+	if !interactive {
+		return false, errors.New("No refresh token available, requires user interaction")
 	}
 
 	code, err := g.Auth(
@@ -227,8 +236,8 @@ func (g *GPhotos) ensureToken() error {
 	)
 
 	if err != nil {
-		return err
+		return true, err
 	}
 
-	return g.Token(code)
+	return true, g.Token(code)
 }
