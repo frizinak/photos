@@ -6,6 +6,14 @@ import (
 	"time"
 )
 
+type Error struct {
+	Error struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Status  string `json:"status"`
+	} `json:"error"`
+}
+
 type BatchCreate struct {
 	AlbumID       string         `json:"albumId,omitempty"`
 	NewMediaItems []*MediaItem   `json:"newMediaItems"`
@@ -27,11 +35,19 @@ type AlbumPosition struct {
 }
 
 type BatchCreateResult struct {
+	Error
 	NewMediaItems []CreateMediaItemResult `json:"newMediaItemResults"`
 }
 
 type BatchGetResult struct {
+	Error
 	MediaItemResults []MediaItemResult `json:"mediaItemResults"`
+}
+
+type ListResult struct {
+	Error
+	MediaItems    []RealMediaItemResult `json:"mediaItems"`
+	NextPageToken string                `json:"nextPageToken"`
 }
 
 type MediaItemResult struct {
@@ -96,6 +112,10 @@ func (b BatchCreateResult) Err() error {
 			return err
 		}
 	}
+	if err := b.Error.Err(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -121,5 +141,17 @@ func (s StatusResult) Err() error {
 		s.Code,
 		s.Message,
 		string(s.Details),
+	)
+}
+
+func (e Error) Err() error {
+	if e.Error.Code == 0 {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"google error: %d: %s",
+		e.Error.Code,
+		e.Error.Message,
 	)
 }

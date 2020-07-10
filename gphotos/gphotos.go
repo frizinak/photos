@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"sync"
 )
 
@@ -52,20 +53,31 @@ func (g *GPhotos) reqJSON(method, url string, d interface{}) (*http.Request, err
 	return g.req(method, url, body)
 }
 
-func (g *GPhotos) do(req *http.Request, d interface{}) (*http.Response, error) {
+type Errorable interface {
+	Err() error
+}
+
+func (g *GPhotos) do(req *http.Request, d Errorable) (*http.Response, error) {
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return res, err
 	}
 
 	defer res.Body.Close()
-	// raw, err := ioutil.ReadAll(res.Body)
+
+	err = json.NewDecoder(res.Body).Decode(d)
+	if err != nil {
+		return res, err
+	}
+
+	// buf := bytes.NewBuffer(nil)
+	// rr := io.TeeReader(res.Body, buf)
+	// err = json.NewDecoder(rr).Decode(d)
 	// if err != nil {
 	// 	return res, err
 	// }
-	// fmt.Println(string(raw))
-	// return res, errors.New("debug")
-	return res, json.NewDecoder(res.Body).Decode(d)
+
+	return res, d.Err()
 }
 
 func (g *GPhotos) Get(id string) (MediaItemResult, error) {
@@ -95,7 +107,54 @@ func (g *GPhotos) GetBatch(ids []string) (BatchGetResult, error) {
 	}
 	req.URL.RawQuery = q.Encode()
 	_, err = g.do(req, &o)
-	return o, nil
+	return o, err
 }
 
-//func (g*GPhotos) List
+func (g *GPhotos) list(amount int, pageToken string) (ListResult, error) {
+	req, err := g.req(
+		"GET",
+		"https://photoslibrary.googleapis.com/v1/mediaItems",
+		nil,
+	)
+
+	var l ListResult
+	if err != nil {
+		return l, err
+	}
+
+	q := req.URL.Query()
+	q.Set("pageSize", strconv.Itoa(amount))
+	if pageToken != "" {
+		q.Set("pageToken", pageToken)
+	}
+	req.URL.RawQuery = q.Encode()
+	_, err = g.do(req, &l)
+	return l, err
+}
+
+func (g *GPhotos) List(minAmount int) ([]RealMediaItemResult, error) {
+	all := make([]RealMediaItemResult, 0, minAmount)
+	var pageToken string
+	n := 100
+	if n > minAmount {
+		n = minAmount
+	}
+	for {
+		d, err := g.list(n, pageToken)
+		if err != nil {
+			return all, err
+		}
+
+		all = append(all, d.MediaItems...)
+		if d.NextPageToken == "" {
+			break
+		}
+		if len(all) >= minAmount {
+			break
+		}
+
+		pageToken = d.NextPageToken
+	}
+
+	return all, nil
+}

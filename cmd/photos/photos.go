@@ -530,8 +530,17 @@ Date: %s
 						continue
 					}
 					p := filepath.Join(flag.JPEGDir(), jpg)
+					tags := []string{}
+					for _, t := range m.Tags.Unique() {
+						tags = append(tags, "+"+t)
+					}
+					descr := fmt.Sprintf("sha512:%s\nRAW:%s\n%s",
+						f.Filename(),
+						m.Checksum,
+						strings.Join(tags, " "),
+					)
 					sem.Lock()
-					list = append(list, gphotos.NewFileUploadTask(p, "withapi"))
+					list = append(list, gphotos.NewFileUploadTask(p, descr))
 					sem.Unlock()
 				}
 				return nil
