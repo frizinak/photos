@@ -535,8 +535,8 @@ Date: %s
 						tags = append(tags, "+"+t)
 					}
 					descr := fmt.Sprintf("sha512:%s\nRAW:%s\n%s",
-						f.Filename(),
 						m.Checksum,
+						f.Filename(),
 						strings.Join(tags, " "),
 					)
 					sem.Lock()
