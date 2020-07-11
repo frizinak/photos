@@ -146,7 +146,6 @@ func (g *GPhotos) BatchUpload(parallel int, tasks []UploadTask, progress func(in
 			for t := range work {
 				fh, err := t.Open()
 				if err != nil {
-					// todo
 					errs <- err
 					break
 				}

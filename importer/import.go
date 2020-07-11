@@ -52,6 +52,7 @@ func Register(name string, backend Backend) {
 
 type Importer struct {
 	log     *log.Logger
+	verbose *log.Logger
 	rawDir  string
 	colDir  string
 	convDir string
@@ -60,10 +61,11 @@ type Importer struct {
 	symlinkCache map[string][]LinkInfo
 }
 
-func New(log *log.Logger, rawDir, colDir, convDir string) *Importer {
+func New(log, verbose *log.Logger, rawDir, colDir, convDir string) *Importer {
 	i := &Importer{
-		log:    log,
-		rawDir: rawDir, colDir: colDir, convDir: convDir,
+		log:     log,
+		verbose: verbose,
+		rawDir:  rawDir, colDir: colDir, convDir: convDir,
 	}
 	i.ClearCache()
 	return i
@@ -133,6 +135,7 @@ func (i *Importer) Import(checksum bool) error {
 
 		p := NewFile(i.rawDir, f.bytes, f.fn)
 		dest := p.Path()
+		i.verbose.Printf("importing %s to %s", f.Path(), p.Path())
 
 		if checksum {
 			defer os.Remove(src)
@@ -176,7 +179,7 @@ func (i *Importer) Import(checksum bool) error {
 		}
 
 		i.log.Printf("Importing with %s", n)
-		if err := b.Import(i.log, tmpdest, exists, add); err != nil {
+		if err := b.Import(i.verbose, tmpdest, exists, add); err != nil {
 			return err
 		}
 	}

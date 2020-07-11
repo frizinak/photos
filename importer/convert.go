@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/frizinak/photos/meta"
 	"github.com/frizinak/photos/pp3"
@@ -26,14 +27,15 @@ func (i *Importer) convert(input, output string, pp *pp3.PP3) error {
 		tmp = output + ".rawtherapeehack.jpg"
 	}
 
-	cmd := exec.Command(
-		"rawtherapee-cli",
+	args := []string{
 		"-Y",
 		"-o", tmp,
 		"-q",
 		"-p", pp3TempPath,
 		"-c", input,
-	)
+	}
+	i.verbose.Printf("rawtherapee-cli %s", strings.Join(args, " "))
+	cmd := exec.Command("rawtherapee-cli", args...)
 
 	buf := bytes.NewBuffer(nil)
 	cmd.Stderr = buf

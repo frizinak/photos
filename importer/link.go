@@ -38,7 +38,7 @@ func (i *Importer) walkLinks(f *File, cb func(string) (bool, error)) error {
 	})
 }
 
-func (i *Importer) link(link string) (*File, error) {
+func (i *Importer) fileFromLink(link string) (*File, error) {
 	var f *File
 	target, err := Abs(link)
 	if err != nil {
@@ -94,7 +94,7 @@ func (i *Importer) scanLinks(dir string, cb func(LinkInfo) (bool, error)) error 
 				return true, nil
 			}
 
-			file, err := i.link(path)
+			file, err := i.fileFromLink(path)
 			if err != nil {
 				if os.IsNotExist(err) {
 					return true, nil
@@ -137,13 +137,6 @@ func (i *Importer) scanLinks(dir string, cb func(LinkInfo) (bool, error)) error 
 	return nil
 }
 
-func (i *Importer) scanLinksList(dir string, data *[]LinkInfo) error {
-	return i.scanLinks(dir, func(l LinkInfo) (bool, error) {
-		*data = append(*data, l)
-		return true, nil
-	})
-}
-
 func Abs(path string) (string, error) {
 	rp, err := filepath.EvalSymlinks(path)
 	if err != nil {
@@ -167,61 +160,53 @@ func NicePath(dir string, f *File, meta meta.Meta) string {
 	)
 }
 
-func (i *Importer) Link() error {
-	i.ClearCache()
-	defer i.ClearCache()
-
-	os.MkdirAll(i.colDir, 0755)
-	data := []LinkInfo{}
-	if err := i.scanLinksList(i.colDir, &data); err != nil {
+func (i *Importer) Link(f *File) error {
+	real, err := Abs(f.Path())
+	if err != nil {
 		return err
 	}
 
-	exist := make(map[string]struct{})
-	for _, f := range data {
-		exist[f.link.Path()] = struct{}{}
-	}
-
-	err := i.All(func(f *File) (bool, error) {
-		real, err := Abs(f.Path())
-		if err != nil {
-			return false, err
+	os.MkdirAll(i.colDir, 0755)
+	exists := false
+	err = i.scanLinks(i.colDir, func(l LinkInfo) (bool, error) {
+		if l.link.Path() == real {
+			exists = true
+			return false, nil
 		}
-
-		if _, ok := exist[real]; ok {
-			return true, nil
-		}
-
-		meta, err := GetMeta(f)
-		if err != nil {
-			return false, err
-		}
-
-		if meta.Deleted {
-			return true, nil
-		}
-
-		linkDest := NicePath(i.colDir, f, meta)
-		linkDir := filepath.Dir(linkDest)
-		os.MkdirAll(linkDir, 0755)
-		linkDir, err = Abs(linkDir)
-		if err != nil {
-			return false, err
-		}
-
-		link, err := filepath.Rel(linkDir, real)
-		if err != nil {
-			return false, fmt.Errorf("Refuse to make non-relative symlinks, make sure both your raw directory and collection directory are on the same filesystem: %w", err)
-		}
-
-		linkDest = filepath.Join(linkDir, filepath.Base(linkDest))
-		i.log.Printf("linking '%s' to '%s'", link, linkDest)
-		if err := os.Symlink(link, linkDest); err != nil {
-			return false, err
-		}
-
 		return true, nil
 	})
 
-	return err
+	if err != nil || exists {
+		return err
+	}
+
+	meta, err := GetMeta(f)
+	if err != nil {
+		return err
+	}
+
+	if meta.Deleted {
+		return nil
+	}
+
+	linkDest := NicePath(i.colDir, f, meta)
+	linkDir := filepath.Dir(linkDest)
+	os.MkdirAll(linkDir, 0755)
+	linkDir, err = Abs(linkDir)
+	if err != nil {
+		return err
+	}
+
+	link, err := filepath.Rel(linkDir, real)
+	if err != nil {
+		return fmt.Errorf("Refuse to make non-relative symlinks, make sure both your raw directory and collection directory are on the same filesystem: %w", err)
+	}
+
+	linkDest = filepath.Join(linkDir, filepath.Base(linkDest))
+	i.verbose.Printf("linking '%s' to '%s'", link, linkDest)
+	if err := os.Symlink(link, linkDest); err != nil {
+		return err
+	}
+
+	return nil
 }

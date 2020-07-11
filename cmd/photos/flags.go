@@ -4,6 +4,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -72,6 +74,7 @@ const (
 	FlagZero               = "0"
 	FlagNoRawPrefix        = "no-raw"
 	FlagGPhotosCredentials = "gphotos"
+	FlagVerbose            = "v"
 )
 
 const (
@@ -253,6 +256,7 @@ special case: '*' only matches files with tags
 	FlagZero: {help: `all stdout output will be separated by a null byte
 e.g.: photos -base . -0 -action show-jpegs -no-raw | xargs -0 feh`},
 	FlagNoRawPrefix: {help: "[show-*] don't prefix output with the corresponding raw file"},
+	FlagVerbose:     {help: "enable verbose stderr logging"},
 }
 
 type Flags struct {
@@ -287,6 +291,7 @@ type Flags struct {
 
 	gphotos string
 
+	log    *log.Logger
 	output func(string)
 	filter Filter
 }
@@ -330,6 +335,8 @@ func (f *Flags) RatingGT() int { return f.rating.gt }
 func (f *Flags) RatingLT() int { return f.rating.lt }
 
 func (f *Flags) GPhotosCredentials() string { return f.gphotos }
+
+func (f *Flags) Log() *log.Logger { return f.log }
 
 func (f *Flags) Filter(imp *importer.Importer) Filter {
 	if f.filter == nil {
@@ -464,6 +471,7 @@ func (f *Flags) Parse() {
 	var gphotos string
 	var since, until string
 	var help bool
+	var verbose bool
 
 	f.fs.BoolVar(&help, "h", false, "help")
 	f.fs.Var(&actions, FlagActions, f.lists.Help(FlagActions))
@@ -493,6 +501,8 @@ func (f *Flags) Parse() {
 	f.fs.BoolVar(&alwaysYes, FlagAlwaysYes, false, f.lists.Help(FlagAlwaysYes))
 	f.fs.BoolVar(&zero, FlagZero, false, f.lists.Help(FlagZero))
 	f.fs.BoolVar(&noRawPrefix, FlagNoRawPrefix, false, f.lists.Help(FlagNoRawPrefix))
+
+	f.fs.BoolVar(&verbose, FlagVerbose, false, f.lists.Help(FlagVerbose))
 
 	f.Err(f.fs.Parse(os.Args[1:]))
 
@@ -581,4 +591,9 @@ func (f *Flags) Parse() {
 	f.maxWorkers = maxWorkers
 	f.rawDir, f.collectionDir, f.jpegDir = rawDir, collectionDir, jpegDir
 	f.gphotos = gphotos
+
+	f.log = log.New(os.Stderr, "", log.LstdFlags)
+	if !verbose {
+		f.log = log.New(ioutil.Discard, "", 0)
+	}
 }

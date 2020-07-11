@@ -77,7 +77,7 @@ func main() {
 	l := log.New(os.Stderr, "", log.LstdFlags)
 	flag := NewFlags()
 	flag.Parse()
-	imp := importer.New(l, flag.RawDir(), flag.CollectionDir(), flag.JPEGDir())
+	imp := importer.New(l, flag.Log(), flag.RawDir(), flag.CollectionDir(), flag.JPEGDir())
 
 	var filter func(f *importer.File) bool
 	all := func(it func(f *importer.File) (bool, error)) {
@@ -283,7 +283,11 @@ func main() {
 		},
 		ActionLink: func() {
 			l.Println("linking")
-			flag.Exit(imp.Link())
+			imp.ClearCache()
+			work(100, func(f *importer.File) error {
+				return imp.Link(f)
+			})
+			imp.ClearCache()
 		},
 		ActionPreviews: func() {
 			l.Println("creating previews")

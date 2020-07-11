@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 
 	"github.com/frizinak/photos/imagemagick"
 	"github.com/frizinak/photos/pp3"
@@ -15,8 +16,35 @@ var (
 	ErrPreviewNotPossible = errors.New("preview not possible for filetype")
 )
 
+var (
+	rawtherapeeAvailable    int
+	rawtherapeeAvailableSem sync.Mutex
+)
+
 func previewFile(f *File) string {
 	return f.Path() + ".preview"
+}
+
+func (i *Importer) rawtherapeeAvailable() bool {
+	if rawtherapeeAvailable != 0 {
+		return rawtherapeeAvailable == 1
+	}
+	rawtherapeeAvailableSem.Lock()
+	defer rawtherapeeAvailableSem.Unlock()
+	if rawtherapeeAvailable != 0 {
+		return rawtherapeeAvailable == 1
+	}
+
+	_, err := exec.LookPath("rawtherapee-cli")
+	if err == nil {
+		i.verbose.Println("creating previews with rawtherapee")
+		rawtherapeeAvailable = 1
+		return true
+	}
+
+	i.verbose.Println("creating previews with convert")
+	rawtherapeeAvailable = -1
+	return false
 }
 
 func (i *Importer) MakePreview(f *File) error {
@@ -25,8 +53,7 @@ func (i *Importer) MakePreview(f *File) error {
 		return ErrPreviewNotPossible
 	}
 
-	_, err = exec.LookPath("rawtherapee-cli")
-	if err != nil {
+	if !i.rawtherapeeAvailable() {
 		return makePreviewImageMagick(f, typ)
 	}
 

@@ -17,7 +17,7 @@ func (i *Importer) GetPP3(link string) (*pp3.PP3, string, error) {
 }
 
 func (i *Importer) PP3ToMeta(link string) error {
-	file, err := i.link(link)
+	file, err := i.fileFromLink(link)
 	if err != nil {
 		return err
 	}
@@ -27,7 +27,7 @@ func (i *Importer) PP3ToMeta(link string) error {
 		return err
 	}
 
-	pp, pp3Path, err := i.GetPP3(link)
+	pp, _, err := i.GetPP3(link)
 	if err != nil {
 		return err
 	}
@@ -36,18 +36,11 @@ func (i *Importer) PP3ToMeta(link string) error {
 	m.Rating = pp.Rank()
 	m.Tags = pp.Keywords()
 
-	currentTime := time.Now().Local()
-	if err := SaveMeta(file, m); err != nil {
-		return err
-	}
-
-	os.Chtimes(metaFile(file), currentTime, currentTime)
-	os.Chtimes(pp3Path, currentTime, currentTime)
-	return nil
+	return SaveMeta(file, m)
 }
 
 func (i *Importer) MetaToPP3(link string) error {
-	file, err := i.link(link)
+	file, err := i.fileFromLink(link)
 	if err != nil {
 		return err
 	}
@@ -72,13 +65,7 @@ func (i *Importer) MetaToPP3(link string) error {
 	pp.Trash(meta.Deleted)
 	pp.SetKeywords(meta.Tags.Unique())
 
-	currentTime := time.Now().Local()
-	if err := pp.Save(); err != nil {
-		return err
-	}
-	os.Chtimes(metaFile(file), currentTime, currentTime)
-	os.Chtimes(pp3Path, currentTime, currentTime)
-	return nil
+	return pp.Save()
 }
 
 type mtime struct {
@@ -92,14 +79,14 @@ func (m mtimes) Less(i, j int) bool { return m[i].time.Before(m[j].time) }
 func (m mtimes) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
 func (m mtimes) Len() int           { return len(m) }
 
-func (i *Importer) syncMetaAndPP3(f *File) ([]string, error) {
+func (i *Importer) syncMetaAndPP3(f *File) (bool, []string, error) {
 	metaPath := metaFile(f)
 	links, err := i.FindLinks(f)
 	if err != nil {
-		return nil, err
+		return false, nil, err
 	}
 	if len(links) == 0 {
-		return nil, nil
+		return false, nil, nil
 	}
 
 	var metaUpdate time.Time
@@ -107,11 +94,11 @@ func (i *Importer) syncMetaAndPP3(f *File) ([]string, error) {
 	if err != nil {
 		metaStat = nil
 		if !os.IsNotExist(err) {
-			return nil, err
+			return false, nil, err
 		}
 		_, err := MakeMeta(f)
 		if err != nil {
-			return nil, err
+			return false, nil, err
 		}
 	}
 
@@ -128,7 +115,7 @@ func (i *Importer) syncMetaAndPP3(f *File) ([]string, error) {
 		if err != nil {
 			pp3Stat = nil
 			if !os.IsNotExist(err) {
-				return nil, err
+				return false, nil, err
 			}
 		}
 
@@ -146,10 +133,14 @@ func (i *Importer) syncMetaAndPP3(f *File) ([]string, error) {
 
 	last := mt[len(mt)-1]
 	meta2pp3 := make(mtimes, 0, len(mt))
+
+	changed := false
 	switch {
 	case last.time.After(metaUpdate):
+		i.verbose.Printf("sync pp3 to meta for %s", f.Path())
+		changed = true
 		if err := i.PP3ToMeta(last.file); err != nil {
-			return list, err
+			return changed, list, err
 		}
 		for n := 0; n < len(mt)-1; n++ {
 			meta2pp3 = append(meta2pp3, mt[n])
@@ -161,16 +152,21 @@ func (i *Importer) syncMetaAndPP3(f *File) ([]string, error) {
 			meta2pp3 = append(meta2pp3, mt[n])
 		}
 	default:
-		return list, err
+		return changed, list, err
+	}
+
+	if len(meta2pp3) != 0 {
+		changed = true
+		i.verbose.Printf("sync meta to pp3 for %s", f.Path())
 	}
 
 	for n := range meta2pp3 {
 		if err := i.MetaToPP3(meta2pp3[n].file); err != nil {
-			return list, err
+			return changed, list, err
 		}
 	}
 
-	return list, nil
+	return changed, list, nil
 }
 
 func (i *Importer) SyncMetaAndPP3(f *File) error {
@@ -178,7 +174,7 @@ func (i *Importer) SyncMetaAndPP3(f *File) error {
 		return nil
 	}
 
-	pp3s, err := i.syncMetaAndPP3(f)
+	changed, paths, err := i.syncMetaAndPP3(f)
 	if err != nil {
 		return err
 	}
@@ -188,14 +184,47 @@ func (i *Importer) SyncMetaAndPP3(f *File) error {
 		return err
 	}
 
-	meta.PP3 = []string{}
-	for _, pp3 := range pp3s {
-		rel, err := filepath.Rel(i.colDir, pp3+".pp3")
+	files := []string{metaFile(f)}
+	newpp := []string{}
+	for _, path := range paths {
+		pp3 := path + ".pp3"
+		files = append(files, pp3)
+		rel, err := filepath.Rel(i.colDir, pp3)
 		if err != nil {
 			return err
 		}
-		meta.PP3 = append(meta.PP3, rel)
+		newpp = append(newpp, rel)
+	}
+	sort.Strings(meta.PP3)
+	sort.Strings(newpp)
+	if !strEqual(meta.PP3, newpp) {
+		changed = true
+		meta.PP3 = newpp
+		if err := SaveMeta(f, meta); err != nil {
+			return err
+		}
 	}
 
-	return SaveMeta(f, meta)
+	if changed {
+		now := time.Now().Local()
+		for _, f := range files {
+			if err := os.Chtimes(f, now, now); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func strEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
