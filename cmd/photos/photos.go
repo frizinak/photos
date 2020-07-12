@@ -91,9 +91,26 @@ func main() {
 		)
 	}
 
-	_progress := func(n, total interface{}) { fmt.Fprintf(os.Stderr, "\033[K\r%4d/%-4d ", n, total) }
-	progress := func(n, total int) { _progress(n, total) }
-	progress32 := func(n, total uint32) { _progress(n, total) }
+	const pbarSize = 17
+	const pbarChar = '#'
+	progress := func(n, total int) {
+		pbar := [pbarSize]rune{}
+		var pct float32
+		if total != 0 {
+			pct = (float32(n) / float32(total))
+		}
+		x := int(pbarSize * pct)
+		for i := 0; i < pbarSize; i++ {
+			if i < x {
+				pbar[i] = pbarChar
+				continue
+			}
+			pbar[i] = 32
+		}
+		fmt.Fprintf(os.Stderr, "\033[K\r[%s] %4d/%-4d ", string(pbar[:]), n, total)
+	}
+
+	progress32 := func(n, total uint32) { progress(int(n), int(total)) }
 	progressDone := func() {
 		fmt.Fprintln(os.Stderr)
 	}
@@ -337,6 +354,7 @@ func main() {
 			if len(sizes) == 0 {
 				flag.Exit(errors.New("no sizes specified"))
 			}
+			l.Printf("converting (sizes: %v)", sizes)
 			work(2, func(f *importer.File) error {
 				return imp.Convert(f, sizes)
 			})
