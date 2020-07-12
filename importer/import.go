@@ -15,10 +15,11 @@ import (
 
 type Exists func(*File) bool
 type Add func(src string, clean *File) error
+type Progress func(n, total int)
 
 type Backend interface {
 	Available() (bool, error)
-	Import(log *log.Logger, destination string, exists Exists, add Add) error
+	Import(log *log.Logger, destination string, exists Exists, add Add, prog Progress) error
 }
 
 var (
@@ -101,7 +102,7 @@ func (i *Importer) SupportedExtList() []string {
 	return l
 }
 
-func (i *Importer) Import(checksum bool) error {
+func (i *Importer) Import(checksum bool, progress Progress) error {
 	os.MkdirAll(i.rawDir, 0755)
 
 	exists := func(f *File) bool {
@@ -179,7 +180,7 @@ func (i *Importer) Import(checksum bool) error {
 		}
 
 		i.log.Printf("Importing with %s", n)
-		if err := b.Import(i.verbose, tmpdest, exists, add); err != nil {
+		if err := b.Import(i.verbose, tmpdest, exists, add, progress); err != nil {
 			return err
 		}
 	}
@@ -197,7 +198,7 @@ func (i *Importer) AllCounted(it func(f *File, n, total int) (bool, error)) erro
 		return err
 	}
 	for n, rf := range files {
-		if cont, err := it(rf, n, len(files)); !cont || err != nil {
+		if cont, err := it(rf, n+1, len(files)); !cont || err != nil {
 			return err
 		}
 	}

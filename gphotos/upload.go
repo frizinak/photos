@@ -119,9 +119,9 @@ func (g *GPhotos) upload(name, mime string, r io.Reader) (string, error) {
 	return string(d), err
 }
 
-func (g *GPhotos) BatchUpload(parallel int, tasks []UploadTask, progress func(int32, int32)) error {
+func (g *GPhotos) BatchUpload(parallel int, tasks []UploadTask, progress func(uint32, uint32)) error {
 	if progress == nil {
-		progress = func(n, total int32) {}
+		progress = func(n, total uint32) {}
 	}
 
 	const maxBatch = 50
@@ -135,8 +135,8 @@ func (g *GPhotos) BatchUpload(parallel int, tasks []UploadTask, progress func(in
 		token string
 	}
 
-	total := int32(len(tasks))
-	var n int32
+	total := uint32(len(tasks))
+	var n uint32
 	work := make(chan UploadTask, parallel)
 	tokens := make(chan *token, maxBatch)
 	errs := make(chan error, parallel)
@@ -154,7 +154,7 @@ func (g *GPhotos) BatchUpload(parallel int, tasks []UploadTask, progress func(in
 					t.Mime(),
 					fh,
 				)
-				progress(atomic.AddInt32(&n, 1), total)
+				progress(atomic.AddUint32(&n, 1), total)
 				t.Close()
 				if err != nil {
 					errs <- err

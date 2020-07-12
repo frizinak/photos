@@ -93,7 +93,7 @@ func (g *GPhoto2) Available() (bool, error) {
 	return hasCamera, scanner.Close()
 }
 
-func (g *GPhoto2) Import(log *log.Logger, destination string, exists importer.Exists, add importer.Add) error {
+func (g *GPhoto2) Import(log *log.Logger, destination string, exists importer.Exists, add importer.Add, prog importer.Progress) error {
 	scanner, err := g.cmd(exec.Command(bin, "-L"))
 	if err != nil {
 		return err
@@ -162,6 +162,7 @@ func (g *GPhoto2) Import(log *log.Logger, destination string, exists importer.Ex
 		}
 		file = importer.NewFile(destination, byt, currentFile)
 		files = append(files, file)
+		prog(0, len(files))
 
 		internalFile := path.Join(currentDir, currentFile)
 		ix := fnMap[internalFile]
@@ -183,7 +184,10 @@ func (g *GPhoto2) Import(log *log.Logger, destination string, exists importer.Ex
 		return err
 	}
 
+	n := 0
 	for scanner.Scan() {
+		n++
+		prog(n, len(files))
 		log.Println(scanner.Text())
 	}
 

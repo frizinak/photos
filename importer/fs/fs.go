@@ -69,7 +69,7 @@ func (f *FS) scan(dir string, data *[]*importer.File) error {
 	return nil
 }
 
-func (f *FS) Import(log *log.Logger, destination string, exists importer.Exists, add importer.Add) error {
+func (f *FS) Import(log *log.Logger, destination string, exists importer.Exists, add importer.Add, prog importer.Progress) error {
 	workers := 8
 	work := make(chan *importer.File, workers)
 	var wg sync.WaitGroup
@@ -105,10 +105,13 @@ func (f *FS) Import(log *log.Logger, destination string, exists importer.Exists,
 		return err
 	}
 
+	n := 0
 	for _, f := range d {
 		if wErr != nil {
 			break
 		}
+		n++
+		prog(n, len(d))
 		work <- f
 	}
 	close(work)

@@ -91,17 +91,24 @@ func main() {
 		)
 	}
 
+	_progress := func(n, total interface{}) { fmt.Fprintf(os.Stderr, "\033[K\r%4d/%-4d ", n, total) }
+	progress := func(n, total int) { _progress(n, total) }
+	progress32 := func(n, total uint32) { _progress(n, total) }
+	progressDone := func() {
+		fmt.Fprintln(os.Stderr)
+	}
+
 	allCounted := func(it func(f *importer.File, n, total int) (bool, error)) {
 		flag.Exit(
 			imp.AllCounted(func(f *importer.File, n, total int) (bool, error) {
-				fmt.Fprintf(os.Stderr, "\033[K\r%4d/%-4d ", n+1, total)
+				progress(n, total)
 				if !filter(f) {
 					return true, nil
 				}
 				return it(f, n, total)
 			}),
 		)
-		fmt.Fprintln(os.Stderr)
+		progressDone()
 	}
 
 	allList := func() []*importer.File {
@@ -177,8 +184,8 @@ func main() {
 				)
 			}
 
-			flag.Exit(imp.Import(flag.Checksum()))
-
+			flag.Exit(imp.Import(flag.Checksum(), progress))
+			progressDone()
 		},
 		ActionShow: func() {
 			all(func(f *importer.File) (bool, error) {
@@ -564,10 +571,8 @@ Date: %s
 
 			flag.Exit(gp.Authenticate(true))
 			l.Println("uploading")
-			flag.Exit(gp.BatchUpload(8, list, func(n, total int32) {
-				fmt.Fprintf(os.Stderr, "\033[K\r%4d/%-4d ", n, total)
-			}))
-			fmt.Fprintln(os.Stderr)
+			flag.Exit(gp.BatchUpload(8, list, progress32))
+			progressDone()
 			l.Println("done")
 		},
 	}
