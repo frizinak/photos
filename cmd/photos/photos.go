@@ -115,6 +115,11 @@ func main() {
 		fmt.Fprintln(os.Stderr)
 	}
 
+	if flag.Verbose() {
+		progress = func(n, total int) {}
+		progressDone = func() {}
+	}
+
 	allCounted := func(it func(f *importer.File, n, total int) (bool, error)) {
 		flag.Exit(
 			imp.AllCounted(func(f *importer.File, n, total int) (bool, error) {

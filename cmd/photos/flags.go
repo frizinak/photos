@@ -282,6 +282,8 @@ type Flags struct {
 
 	alwaysYes bool
 
+	verbose bool
+
 	sizes []int
 
 	noRawPrefix bool
@@ -333,6 +335,8 @@ func (f *Flags) Sizes() []int { return f.sizes }
 
 func (f *Flags) RatingGT() int { return f.rating.gt }
 func (f *Flags) RatingLT() int { return f.rating.lt }
+
+func (f *Flags) Verbose() bool { return f.verbose }
 
 func (f *Flags) GPhotosCredentials() string { return f.gphotos }
 
@@ -591,6 +595,7 @@ func (f *Flags) Parse() {
 	f.maxWorkers = maxWorkers
 	f.rawDir, f.collectionDir, f.jpegDir = rawDir, collectionDir, jpegDir
 	f.gphotos = gphotos
+	f.verbose = verbose
 
 	f.log = log.New(os.Stderr, "", log.LstdFlags)
 	if !verbose {
