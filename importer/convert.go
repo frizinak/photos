@@ -131,12 +131,13 @@ func (i *Importer) Convert(f *File, sizes []int) error {
 	if err != nil {
 		return err
 	}
+
+	conv := m.Conv
+	if conv == nil {
+		conv = make(map[string]meta.Converted)
+	}
+	rels := make(map[string]struct{}, len(conv))
 	for n, link := range links {
-		conv := m.Conv
-		if conv == nil {
-			conv = make(map[string]meta.Converted)
-		}
-		rels := make(map[string]struct{}, len(conv))
 		for _, s := range sizes {
 			custom, err := filepath.Rel(i.colDir, link)
 			if err != nil {
@@ -154,15 +155,14 @@ func (i *Importer) Convert(f *File, sizes []int) error {
 			}
 			rels[rel] = struct{}{}
 		}
-
-		for k := range conv {
-			if _, ok := rels[k]; !ok {
-				delete(conv, k)
-			}
-		}
-
-		m.Conv = conv
 	}
+
+	for k := range conv {
+		if _, ok := rels[k]; !ok {
+			delete(conv, k)
+		}
+	}
+	m.Conv = conv
 
 	return SaveMeta(f, m)
 }
