@@ -18,7 +18,7 @@ func MakeMeta(f *File) (meta.Meta, error) {
 	}
 
 	if err != nil {
-		m = meta.New(f.Bytes(), f.FilenameWithoutBytes(), f.Filename())
+		m = meta.New(f.Bytes(), f.BaseFilename(), f.Filename())
 	}
 
 	tags := tags.Parse(f.Path())

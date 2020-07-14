@@ -192,7 +192,7 @@ func (g *GPhoto2) Import(log *log.Logger, destination string, exists importer.Ex
 	}
 
 	for _, f := range files {
-		if err := add(f.PathWithoutBytes(), f); err != nil {
+		if err := add(f.BasePath(), f); err != nil {
 			return err
 		}
 	}

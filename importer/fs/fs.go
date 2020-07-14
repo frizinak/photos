@@ -82,10 +82,10 @@ func (f *FS) Import(log *log.Logger, destination string, exists importer.Exists,
 					continue
 				}
 
-				fn := filepath.Base(f.PathWithoutBytes())
+				fn := filepath.Base(f.BasePath())
 				d := importer.NewFile(destination, f.Bytes(), fn)
 				p := d.Path()
-				if err := copy(f.PathWithoutBytes(), p); err != nil {
+				if err := copy(f.BasePath(), p); err != nil {
 					wErr = err
 					break
 				}

@@ -155,7 +155,7 @@ func NicePath(dir string, f *File, meta meta.Meta) string {
 		fmt.Sprintf(
 			"%s--%s",
 			d.Format("2006-01-02-15-04"),
-			f.FilenameWithoutBytes(),
+			f.BaseFilename(),
 		),
 	)
 }

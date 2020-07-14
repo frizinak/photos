@@ -33,9 +33,9 @@ func NewFileFromPath(path string) *File {
 	return &File{dir: dir, bytes: bytes, fn: fn}
 }
 
-func (f *File) PathWithoutBytes() string {
+func (f *File) BasePath() string {
 	if f._pathwb == "" {
-		f._pathwb = filepath.Join(f.dir, f.FilenameWithoutBytes())
+		f._pathwb = filepath.Join(f.dir, f.BaseFilename())
 	}
 	return f._pathwb
 }
@@ -47,7 +47,7 @@ func (f *File) Path() string {
 	return f._path
 }
 
-func (f *File) FilenameWithoutBytes() string { return f.fn }
+func (f *File) BaseFilename() string { return f.fn }
 
 func (f *File) Filename() string {
 	if f._fn == "" {
@@ -62,4 +62,4 @@ type Files []*File
 
 func (f Files) Len() int           { return len(f) }
 func (f Files) Swap(i, j int)      { f[i], f[j] = f[j], f[i] }
-func (f Files) Less(i, j int) bool { return f[i].FilenameWithoutBytes() < f[j].FilenameWithoutBytes() }
+func (f Files) Less(i, j int) bool { return f[i].BaseFilename() < f[j].BaseFilename() }
