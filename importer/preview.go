@@ -21,7 +21,7 @@ var (
 	rawtherapeeAvailableSem sync.Mutex
 )
 
-func previewFile(f *File) string {
+func PreviewFile(f *File) string {
 	return f.Path() + ".preview"
 }
 
@@ -57,7 +57,7 @@ func (i *Importer) MakePreview(f *File) error {
 		return makePreviewImageMagick(f, typ)
 	}
 
-	out := previewFile(f)
+	out := PreviewFile(f)
 	tmp := out + ".tmp"
 	pp, err := pp3.New(tmp + ".pp3")
 	if err != nil {
@@ -78,7 +78,7 @@ func makePreviewImageMagick(f *File, typ imagemagick.Type) error {
 	}
 	defer src.Close()
 
-	real := previewFile(f)
+	real := PreviewFile(f)
 	tmp := real + ".tmp"
 	dst, err := os.Create(tmp)
 	if err != nil {
@@ -98,7 +98,7 @@ func makePreviewImageMagick(f *File, typ imagemagick.Type) error {
 }
 
 func GetPreview(f *File) (io.ReadCloser, error) {
-	return os.Open(previewFile(f))
+	return os.Open(PreviewFile(f))
 }
 
 func (i *Importer) EnsurePreview(f *File) error {

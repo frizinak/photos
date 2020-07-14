@@ -215,6 +215,25 @@ func main() {
 				return true, nil
 			})
 		},
+		ActionShowPreviews: func() {
+			all(func(f *importer.File) (bool, error) {
+				p := importer.PreviewFile(f)
+				_, err := os.Stat(p)
+				if err != nil {
+					if os.IsNotExist(err) {
+						return false, nil
+					}
+					return false, err
+				}
+
+				if flag.NoRawPrefix() {
+					flag.Output(p)
+					return true, nil
+				}
+				flag.Output(fmt.Sprintf("%s: %s", f.Path(), p))
+				return true, nil
+			})
+		},
 		ActionShowJPEGs: func() {
 			list := allMeta()
 			sort.Sort(list)

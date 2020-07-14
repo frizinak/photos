@@ -78,22 +78,23 @@ const (
 )
 
 const (
-	ActionImport     = "import"
-	ActionShow       = "show"
-	ActionShowJPEGs  = "show-jpegs"
-	ActionShowLinks  = "show-links"
-	ActionShowTags   = "show-tags"
-	ActionInfo       = "info"
-	ActionLink       = "link"
-	ActionPreviews   = "previews"
-	ActionRate       = "rate"
-	ActionSyncMeta   = "sync-meta"
-	ActionConvert    = "convert"
-	ActionExec       = "exec"
-	ActionCleanup    = "cleanup"
-	ActionTagsRemove = "remove-tags"
-	ActionTagsAdd    = "add-tags"
-	ActionGPhotos    = "gphotos"
+	ActionImport       = "import"
+	ActionShow         = "show"
+	ActionShowJPEGs    = "show-jpegs"
+	ActionShowPreviews = "show-previews"
+	ActionShowLinks    = "show-links"
+	ActionShowTags     = "show-tags"
+	ActionInfo         = "info"
+	ActionLink         = "link"
+	ActionPreviews     = "previews"
+	ActionRate         = "rate"
+	ActionSyncMeta     = "sync-meta"
+	ActionConvert      = "convert"
+	ActionExec         = "exec"
+	ActionCleanup      = "cleanup"
+	ActionTagsRemove   = "remove-tags"
+	ActionTagsAdd      = "add-tags"
+	ActionGPhotos      = "gphotos"
 
 	FilterUndeleted = "undeleted"
 	FilterDeleted   = "deleted"
@@ -105,22 +106,23 @@ const (
 
 var (
 	AllActions = map[string]struct{}{
-		ActionImport:     struct{}{},
-		ActionShow:       struct{}{},
-		ActionShowJPEGs:  struct{}{},
-		ActionShowLinks:  struct{}{},
-		ActionShowTags:   struct{}{},
-		ActionInfo:       struct{}{},
-		ActionLink:       struct{}{},
-		ActionPreviews:   struct{}{},
-		ActionRate:       struct{}{},
-		ActionSyncMeta:   struct{}{},
-		ActionConvert:    struct{}{},
-		ActionExec:       struct{}{},
-		ActionCleanup:    struct{}{},
-		ActionTagsRemove: struct{}{},
-		ActionTagsAdd:    struct{}{},
-		ActionGPhotos:    struct{}{},
+		ActionImport:       struct{}{},
+		ActionShow:         struct{}{},
+		ActionShowPreviews: struct{}{},
+		ActionShowJPEGs:    struct{}{},
+		ActionShowLinks:    struct{}{},
+		ActionShowTags:     struct{}{},
+		ActionInfo:         struct{}{},
+		ActionLink:         struct{}{},
+		ActionPreviews:     struct{}{},
+		ActionRate:         struct{}{},
+		ActionSyncMeta:     struct{}{},
+		ActionConvert:      struct{}{},
+		ActionExec:         struct{}{},
+		ActionCleanup:      struct{}{},
+		ActionTagsRemove:   struct{}{},
+		ActionTagsAdd:      struct{}{},
+		ActionGPhotos:      struct{}{},
 	}
 
 	allFilters = map[string]struct{}{
@@ -166,16 +168,17 @@ var lists = Lists{
 	FlagActions: {
 		help: "list of actions (comma separated and/or specified multiple times)",
 		list: map[string][]string{
-			ActionImport:    {"Import media from connected camera (gphoto2) and any given directory (-source) to the directory specified with -raws"},
-			ActionShow:      {"Show raws (filter with -filter)"},
-			ActionShowJPEGs: {"Show jpegs (filter with -filter) (see -no-raw)"},
-			ActionShowLinks: {"Show links (filter with -filter) (see -no-raw)"},
-			ActionShowTags:  {"Show all tags"},
-			ActionInfo:      {"Show info for given RAWs"},
-			ActionLink:      {"Create collection symlinks in the given directory (-collection)"},
-			ActionPreviews:  {"Generate simple jpeg previews (used by -action rate)"},
-			ActionRate:      {"Simple opengl window to rate / trash images (filter with -filter)"},
-			ActionSyncMeta:  {"Sync .meta file with .pp3 (file mtime determines which one is the authority) and filesystem"},
+			ActionImport:       {"Import media from connected camera (gphoto2) and any given directory (-source) to the directory specified with -raws"},
+			ActionShow:         {"Show raws (filter with -filter)"},
+			ActionShowPreviews: {"Show jpegs (filter with -filter) (see -no-raw)"},
+			ActionShowJPEGs:    {"Show previews (filter with -filter) (see -no-raw)"},
+			ActionShowLinks:    {"Show links (filter with -filter) (see -no-raw)"},
+			ActionShowTags:     {"Show all tags"},
+			ActionInfo:         {"Show info for given RAWs"},
+			ActionLink:         {"Create collection symlinks in the given directory (-collection)"},
+			ActionPreviews:     {"Generate simple jpeg previews (used by -action rate)"},
+			ActionRate:         {"Simple opengl window to rate / trash images (filter with -filter)"},
+			ActionSyncMeta:     {"Sync .meta file with .pp3 (file mtime determines which one is the authority) and filesystem"},
 			ActionConvert: {
 				"Convert images to jpegs resized with -sizes (filter with -filter)",
 				"These conversions are tracked in .meta i.e.:",
