@@ -1,6 +1,7 @@
 package gphotos
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -63,7 +64,7 @@ func (g *GPhotos) Auth(scopes []string) (string, error) {
 			codeResponse = r.URL.Query().Get("code")
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("Success, you can close this tab now."))
-			go server.Shutdown(nil)
+			go server.Shutdown(context.Background())
 		})
 
 		if err := server.ListenAndServe(); err != nil {
