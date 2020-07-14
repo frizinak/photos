@@ -126,6 +126,7 @@ func (i *Importer) Import(checksum bool, progress Progress) error {
 			panic(err)
 		}
 
+		i.verbose.Printf("skipping %s, exists as %s", f.fn, p)
 		return true
 	}
 
