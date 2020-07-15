@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/frizinak/photos/gphotos"
+	"github.com/frizinak/photos/gtimeline"
 	"github.com/frizinak/photos/importer"
 	"github.com/frizinak/photos/importer/fs"
 	_ "github.com/frizinak/photos/importer/gphoto2"
@@ -489,12 +490,22 @@ func main() {
 					c = "Converted[]:"
 				}
 
+				var ll, loc, addr string
+				if info.m.Location != nil {
+					ll = fmt.Sprintf("%f,%f", info.m.Location.Lat, info.m.Location.Lng)
+					loc = info.m.Location.Name
+					addr = info.m.Location.Address
+				}
+
 				flag.Output(
 					fmt.Sprintf(`RAW: %s
 Size: %d
 Deleted: %t
 Rank: %d
 Date: %s
+LatLng: %s
+Location: %s
+Address: %s
 %s
 %s
 %s
@@ -504,6 +515,9 @@ Date: %s
 						info.m.Deleted,
 						info.m.Rating,
 						info.m.CreatedTime().Format(time.RFC3339),
+						ll,
+						loc,
+						addr,
 						l,
 						c,
 						t,
@@ -616,6 +630,67 @@ Date: %s
 			flag.Exit(gp.BatchUpload(8, list, progress32))
 			progressDone()
 			l.Println("done")
+		},
+		ActionGLocation: func() {
+			l.Println("gathering date information of images")
+			sess := strings.TrimSpace(flag.GLocationCredentials())
+			if sess == "" {
+				flag.Exit(fmt.Errorf("please provide your google timeline session id (%s)", gtimeline.SessID))
+			}
+
+			docs := gtimeline.New(sess)
+			var first, last time.Time
+			work(100, func(f *importer.File) error {
+				m, err := importer.GetMeta(f)
+				if err != nil {
+					return err
+				}
+				t := m.CreatedTime()
+				if first == (time.Time{}) || t.Before(first) {
+					first = t
+				}
+				if last == (time.Time{}) || t.After(last) {
+					last = t
+				}
+				return nil
+			})
+
+			if first == (time.Time{}) {
+				l.Println("nothing to do")
+				return
+			}
+
+			l.Println("fetching google timeline kmls")
+			_, err := docs.GetDayRange(first, last, 8, progress)
+			progressDone()
+			flag.Exit(err)
+
+			l.Println("updating meta with google timeline location information")
+			work(100, func(f *importer.File) error {
+				m, err := importer.GetMeta(f)
+				if err != nil {
+					return err
+				}
+
+				c := m.CreatedTime()
+				p, ll, err := docs.GetLatLng(c)
+				if err != nil {
+					if err != gtimeline.ErrNoLatLng && err != gtimeline.ErrNoPlaceMark {
+						return err
+					}
+					l.Printf("could not find location info for %s at %s", f.Path(), c.Local())
+					return nil
+				}
+
+				m.Location = &meta.Location{
+					Lat:     ll.Lat,
+					Lng:     ll.Lng,
+					Name:    p.Name,
+					Address: p.Address,
+				}
+
+				return importer.SaveMeta(f, m)
+			})
 		},
 	}
 

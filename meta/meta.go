@@ -45,7 +45,15 @@ type Meta struct {
 	PP3  []string
 	Conv map[string]Converted
 
-	Tags Tags
+	Tags     Tags
+	Location *Location
+}
+
+type Location struct {
+	Lat     float64
+	Lng     float64
+	Name    string
+	Address string
 }
 
 func New(size int64, real string, base string) Meta {

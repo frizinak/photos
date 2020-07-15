@@ -168,8 +168,7 @@ func (g *GPhotos) BatchUpload(parallel int, tasks []UploadTask, progress func(ui
 	}
 
 	berrs := make(chan error, 1)
-	var wg2 sync.WaitGroup
-	wg2.Add(1)
+	done := make(chan struct{}, 1)
 	var result BatchCreateResult
 	go func() {
 		do := func(list []*token) error {
@@ -200,7 +199,8 @@ func (g *GPhotos) BatchUpload(parallel int, tasks []UploadTask, progress func(ui
 				list = list[0:0]
 				if err != nil {
 					berrs <- err
-					break
+					done <- struct{}{}
+					return
 				}
 			}
 		}
@@ -208,7 +208,7 @@ func (g *GPhotos) BatchUpload(parallel int, tasks []UploadTask, progress func(ui
 		if err := do(list); err != nil {
 			berrs <- err
 		}
-		wg2.Done()
+		done <- struct{}{}
 	}()
 
 	var gerr error
@@ -235,9 +235,13 @@ outer:
 	if gerr != nil {
 		return gerr
 	}
-	wg2.Wait()
+	select {
+	case err := <-berrs:
+		return err
+	case <-done:
+	}
 
-	return gerr
+	return nil
 }
 
 func (g *GPhotos) UploadJPEG(name string, r io.Reader) error {

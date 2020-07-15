@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/frizinak/photos/gtimeline"
 	"github.com/frizinak/photos/importer"
 	"github.com/frizinak/photos/meta"
 )
@@ -55,26 +56,27 @@ func parseTime(str string, eod bool) (*time.Time, error) {
 }
 
 const (
-	FlagActions            = "action"
-	FlagFilters            = "filter"
-	FlagGT                 = "gt"
-	FlagLT                 = "lt"
-	FlagSince              = "since"
-	FlagUntil              = "until"
-	FlagTags               = "tag"
-	FlagChecksum           = "sum"
-	FlagSizes              = "sizes"
-	FlagRawDir             = "raws"
-	FlagCollectionDir      = "collection"
-	FlagJPEGDir            = "jpegs"
-	FlagMaxWorkers         = "workers"
-	FlagBaseDir            = "base"
-	FlagSourceDir          = "source"
-	FlagAlwaysYes          = "y"
-	FlagZero               = "0"
-	FlagNoRawPrefix        = "no-raw"
-	FlagGPhotosCredentials = "gphotos"
-	FlagVerbose            = "v"
+	FlagActions              = "action"
+	FlagFilters              = "filter"
+	FlagGT                   = "gt"
+	FlagLT                   = "lt"
+	FlagSince                = "since"
+	FlagUntil                = "until"
+	FlagTags                 = "tag"
+	FlagChecksum             = "sum"
+	FlagSizes                = "sizes"
+	FlagRawDir               = "raws"
+	FlagCollectionDir        = "collection"
+	FlagJPEGDir              = "jpegs"
+	FlagMaxWorkers           = "workers"
+	FlagBaseDir              = "base"
+	FlagSourceDir            = "source"
+	FlagAlwaysYes            = "y"
+	FlagZero                 = "0"
+	FlagNoRawPrefix          = "no-raw"
+	FlagGPhotosCredentials   = "gphotos"
+	FlagGLocationCredentials = "glocation"
+	FlagVerbose              = "v"
 )
 
 const (
@@ -95,6 +97,7 @@ const (
 	ActionTagsRemove   = "remove-tags"
 	ActionTagsAdd      = "add-tags"
 	ActionGPhotos      = "gphotos"
+	ActionGLocation    = "glocation"
 
 	FilterUndeleted = "undeleted"
 	FilterDeleted   = "deleted"
@@ -123,6 +126,7 @@ var (
 		ActionTagsRemove:   struct{}{},
 		ActionTagsAdd:      struct{}{},
 		ActionGPhotos:      struct{}{},
+		ActionGLocation:    struct{}{},
 	}
 
 	allFilters = map[string]struct{}{
@@ -200,6 +204,11 @@ var lists = Lists{
 			ActionTagsRemove: {"Remove tags (first non flag argument are the tags that will be removed)"},
 			ActionTagsAdd:    {"Add tag (first non flag argument are the tags that will be removed)"},
 			ActionGPhotos:    {"Upload converted photos to google photos"},
+			ActionGLocation: {
+				"Update meta with location information extracted from google timeline kml",
+				fmt.Sprintf("requires -glocation flag with your %s cookie value", gtimeline.SessID),
+				"!!! there is nothing safe about this, this is your google session id",
+			},
 		},
 	},
 
@@ -251,6 +260,12 @@ special case: '*' only matches files with tags
 -gphotos (if not given)    = <basedir>/gphotos.credentials
 `},
 	FlagGPhotosCredentials: {help: "[gphotos] path to the google credentials file"},
+	FlagGLocationCredentials: {
+		help: fmt.Sprintf(
+			"[glocation] your %s cookie value (see -action glocation)",
+			gtimeline.SessID,
+		),
+	},
 
 	FlagMaxWorkers: {help: "[all] maximum amount of threads"},
 	FlagSourceDir:  {help: "[import] filesystem paths to import from, can be specified multiple times"},
@@ -294,7 +309,8 @@ type Flags struct {
 
 	maxWorkers int
 
-	gphotos string
+	gphotos   string
+	glocation string
 
 	log    *log.Logger
 	output func(string)
@@ -341,7 +357,8 @@ func (f *Flags) RatingLT() int { return f.rating.lt }
 
 func (f *Flags) Verbose() bool { return f.verbose }
 
-func (f *Flags) GPhotosCredentials() string { return f.gphotos }
+func (f *Flags) GPhotosCredentials() string   { return f.gphotos }
+func (f *Flags) GLocationCredentials() string { return f.glocation }
 
 func (f *Flags) Log() *log.Logger { return f.log }
 
@@ -476,6 +493,7 @@ func (f *Flags) Parse() {
 	var noRawPrefix bool
 	var tags flagStrs
 	var gphotos string
+	var glocation string
 	var since, until string
 	var help bool
 	var verbose bool
@@ -498,6 +516,7 @@ func (f *Flags) Parse() {
 	f.fs.StringVar(&jpegDir, FlagJPEGDir, "", f.lists.Help(FlagJPEGDir))
 
 	f.fs.StringVar(&gphotos, FlagGPhotosCredentials, "", f.lists.Help(FlagGPhotosCredentials))
+	f.fs.StringVar(&glocation, FlagGLocationCredentials, "", f.lists.Help(FlagGLocationCredentials))
 
 	f.fs.IntVar(&maxWorkers, FlagMaxWorkers, 100, f.lists.Help(FlagMaxWorkers))
 
@@ -598,6 +617,7 @@ func (f *Flags) Parse() {
 	f.maxWorkers = maxWorkers
 	f.rawDir, f.collectionDir, f.jpegDir = rawDir, collectionDir, jpegDir
 	f.gphotos = gphotos
+	f.glocation = glocation
 	f.verbose = verbose
 
 	f.log = log.New(os.Stderr, "", log.LstdFlags)
