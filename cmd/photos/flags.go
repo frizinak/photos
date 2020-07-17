@@ -258,8 +258,8 @@ special case: '*' only matches files with tags
 		help: `[import,rewrite-meta] timezone offset in minutes.
 Since there is no standard in exif timezone data the time we store in .meta will be off unless your camera is set to UTC.
 Set this to the timezone your camera is ALWAYS in, won't work if your camera has correcly applied daylight saving times (set either automatically or manually).
-e.g.: daylight saving time always off in brussels: -tz-minutes 120
-e.g.: daylight saving time always on             : -tz-minutes 60`,
+e.g.: daylight saving time always off in brussels: -tz 120
+e.g.: daylight saving time always on             : -tz 60`,
 	},
 
 	FlagRawDir:        {help: "[any] Raw directory"},

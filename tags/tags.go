@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,7 +12,50 @@ import (
 	"time"
 
 	"github.com/rwcarlsen/goexif/exif"
+	"github.com/rwcarlsen/goexif/tiff"
 )
+
+type parser struct {
+}
+
+const (
+	exifOffsetTime    = "OffsetTime"
+	exifOffsetTimeFB1 = "OffsetTimeFallback1"
+	exifOffsetTimeFB2 = "OffsetTimeFallback2"
+)
+
+var exifFields = map[uint16]exif.FieldName{
+	0x9010: exifOffsetTime,
+	0x9011: exifOffsetTimeFB1,
+	0x9012: exifOffsetTimeFB2,
+}
+
+func (p *parser) Parse(x *exif.Exif) error {
+	ptr, err := x.Get("ExifIFDPointer")
+	if err != nil {
+		return nil
+	}
+	offset, err := ptr.Int(0)
+	if err != nil {
+		return nil
+	}
+	r := bytes.NewReader(x.Raw)
+	_, err = r.Seek(int64(offset), io.SeekStart)
+	if err != nil {
+		return err
+	}
+	subDir, _, err := tiff.DecodeDir(r, x.Tiff.Order)
+	if err != nil {
+		return nil
+	}
+
+	x.LoadTags(subDir, exifFields, false)
+	return nil
+}
+
+func init() {
+	exif.RegisterParsers(&parser{})
+}
 
 type Tags struct {
 	ex  *exif.Exif
@@ -45,9 +89,32 @@ func (t *Tags) exifDate(tzOffset int) (time.Time, error) {
 		}
 	}
 
+	var exOffset string
+	names := []exif.FieldName{exifOffsetTime, exifOffsetTimeFB1, exifOffsetTimeFB2}
+	for _, n := range names {
+		o, err := t.ex.Get(n)
+		if err != nil {
+			continue
+		}
+		v, err := o.StringVal()
+		if err != nil {
+			continue
+		}
+		v = strings.TrimRight(v, "\x00")
+		if v == "" {
+			continue
+		}
+		exOffset = v
+		break
+	}
+
 	s, err := tag.StringVal()
 	if err != nil {
 		return dt, err
+	}
+
+	if exOffset != "" {
+		return time.Parse("2006:01:02 15:04:05 -07:00", s+" "+exOffset)
 	}
 
 	dt, err = time.ParseInLocation(
