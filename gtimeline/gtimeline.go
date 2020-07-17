@@ -64,20 +64,21 @@ func (d *Documents) get(day time.Time) (Document, bool) {
 var ErrNoPlaceMark = errors.New("no placemark found")
 var ErrNoLatLng = errors.New("no latlng found")
 
-func (d *Documents) GetPlace(moment time.Time, maxMargin time.Duration) (Placemark, time.Duration, error) {
+func (d *Documents) GetPlace(moment time.Time, extraDays int) (Placemark, time.Duration, error) {
 	var p Placemark
-	docs, err := d.GetDayRange(moment.Add(-maxMargin), moment.Add(maxMargin), 8, nil)
+	margin := time.Hour * 24 * time.Duration(extraDays)
+	docs, err := d.GetDayRange(moment.Add(-margin), moment.Add(margin), 8, nil)
 	if err != nil {
-		return p, maxMargin, err
+		return p, 0, err
 	}
 
-	closest := maxMargin + time.Second
+	closest := margin + time.Second
 	chk := func(t time.Time) bool {
 		d := moment.Sub(t)
 		if d < 0 {
 			d = -d
 		}
-		if d < closest && d < maxMargin {
+		if d < closest && d < margin {
 			closest = d
 			return true
 		}
@@ -98,25 +99,33 @@ func (d *Documents) GetPlace(moment time.Time, maxMargin time.Duration) (Placema
 		}
 	}
 
-	if closest > maxMargin {
+	if closest > margin {
 		err = ErrNoPlaceMark
 	}
 
 	return p, closest, err
 }
 
-func (d *Documents) GetLatLng(moment time.Time) (Placemark, LatLng, error) {
+func (d *Documents) GetLatLng(moment time.Time, extraDays int) (Placemark, LatLng, error) {
 	var p Placemark
 	var ll LatLng
 	var err error
-	p, _, err = d.GetPlace(moment, time.Duration(0))
+	var margin time.Duration
+	p, margin, err = d.GetPlace(moment, extraDays)
 	if err != nil {
 		return p, ll, err
 	}
+
+	// exact only
+	if margin != 0 {
+		return p, ll, ErrNoPlaceMark
+	}
+
 	var ok bool
 	if ll, ok = p.LatLng(moment); ok {
 		return p, ll, nil
 	}
+
 	return p, ll, ErrNoLatLng
 }
 

@@ -78,7 +78,8 @@ func main() {
 	l := log.New(os.Stderr, "", log.LstdFlags)
 	flag := NewFlags()
 	flag.Parse()
-	imp := importer.New(l, flag.Log(), flag.RawDir(), flag.CollectionDir(), flag.JPEGDir())
+	tzOffset, tzOffsetOK := flag.TZOffset()
+	imp := importer.New(l, flag.Log(), tzOffset, flag.RawDir(), flag.CollectionDir(), flag.JPEGDir())
 
 	var filter func(f *importer.File) bool
 	all := func(it func(f *importer.File) (bool, error)) {
@@ -90,6 +91,12 @@ func main() {
 				return it(f)
 			}),
 		)
+	}
+
+	tzExit := func() {
+		if !tzOffsetOK {
+			flag.Exit(errors.New("no timezone offset set"))
+		}
 	}
 
 	const pbarSize = 17
@@ -199,6 +206,7 @@ func main() {
 
 	cmds := map[string]func(){
 		ActionImport: func() {
+			tzExit()
 			l.Println("importing")
 			for _, path := range flag.SourceDirs() {
 				importer.Register(
@@ -366,12 +374,20 @@ func main() {
 				return
 			}
 
-			flag.Exit(rate.New(l, list, imp).Run())
+			flag.Exit(rate.New(l, tzOffset, list, imp).Run())
 		},
 		ActionSyncMeta: func() {
 			l.Println("syncing meta")
 			work(-1, func(f *importer.File) error {
 				return imp.SyncMetaAndPP3(f)
+			})
+		},
+		ActionRewriteMeta: func() {
+			tzExit()
+			l.Println("rewriting meta")
+			work(-1, func(f *importer.File) error {
+				_, err := importer.MakeMeta(f, tzOffset)
+				return err
 			})
 		},
 		ActionConvert: func() {
@@ -661,6 +677,9 @@ Address: %s
 			}
 
 			l.Println("fetching google timeline kmls")
+			extraDays := 31
+			first = first.Add(-time.Hour * 24 * time.Duration(extraDays))
+			last = last.Add(time.Hour * 24 * time.Duration(extraDays))
 			_, err := docs.GetDayRange(first, last, 8, progress)
 			progressDone()
 			flag.Exit(err)
@@ -673,7 +692,7 @@ Address: %s
 				}
 
 				c := m.CreatedTime()
-				p, ll, err := docs.GetLatLng(c)
+				p, ll, err := docs.GetLatLng(c, extraDays)
 				if err != nil {
 					if err != gtimeline.ErrNoLatLng && err != gtimeline.ErrNoPlaceMark {
 						return err

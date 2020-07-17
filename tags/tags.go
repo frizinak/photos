@@ -21,9 +21,9 @@ type Tags struct {
 
 func (t *Tags) Err() error { return t.err }
 
-func (t *Tags) Date() time.Time {
+func (t *Tags) Date(tzOffsetMinutes int) time.Time {
 	if t.ex != nil {
-		d, err := t.ex.DateTime()
+		d, err := t.exifDate(tzOffsetMinutes)
 		if err != nil {
 			panic(err)
 		}
@@ -33,6 +33,32 @@ func (t *Tags) Date() time.Time {
 		return t.ff.Date()
 	}
 	return time.Time{}
+}
+
+func (t *Tags) exifDate(tzOffset int) (time.Time, error) {
+	var dt time.Time
+	tag, err := t.ex.Get("DateTimeOriginal")
+	if err != nil {
+		tag, err = t.ex.Get("DateTime")
+		if err != nil {
+			return dt, err
+		}
+	}
+
+	s, err := tag.StringVal()
+	if err != nil {
+		return dt, err
+	}
+
+	dt, err = time.ParseInLocation(
+		"2006:01:02 15:04:05",
+		strings.TrimRight(s, "\x00"),
+		time.FixedZone("Fixed", int((time.Minute*time.Duration(tzOffset)).Seconds())),
+	)
+	if err != nil {
+		return dt, err
+	}
+	return dt.Local(), nil
 }
 
 func Parse(path string) *Tags {

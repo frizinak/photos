@@ -77,6 +77,7 @@ const (
 	FlagGPhotosCredentials   = "gphotos"
 	FlagGLocationCredentials = "glocation"
 	FlagVerbose              = "v"
+	FlagCameraFixedTZ        = "tz"
 )
 
 const (
@@ -91,6 +92,7 @@ const (
 	ActionPreviews     = "previews"
 	ActionRate         = "rate"
 	ActionSyncMeta     = "sync-meta"
+	ActionRewriteMeta  = "rewrite-meta"
 	ActionConvert      = "convert"
 	ActionExec         = "exec"
 	ActionCleanup      = "cleanup"
@@ -120,6 +122,7 @@ var (
 		ActionPreviews:     struct{}{},
 		ActionRate:         struct{}{},
 		ActionSyncMeta:     struct{}{},
+		ActionRewriteMeta:  struct{}{},
 		ActionConvert:      struct{}{},
 		ActionExec:         struct{}{},
 		ActionCleanup:      struct{}{},
@@ -183,6 +186,7 @@ var lists = Lists{
 			ActionPreviews:     {"Generate simple jpeg previews (used by -action rate)"},
 			ActionRate:         {"Simple opengl window to rate / trash images (filter with -filter)"},
 			ActionSyncMeta:     {"Sync .meta file with .pp3 (file mtime determines which one is the authority) and filesystem"},
+			ActionRewriteMeta:  {"Rewrite .meta, make sure you synced first so newer pp3s are not overwritten."},
 			ActionConvert: {
 				"Convert images to jpegs resized with -sizes (filter with -filter)",
 				"These conversions are tracked in .meta i.e.:",
@@ -250,6 +254,14 @@ special case: '*' only matches files with tags
 		},
 	},
 
+	FlagCameraFixedTZ: {
+		help: `[import,rewrite-meta] timezone offset in minutes.
+Since there is no standard in exif timezone data the time we store in .meta will be off unless your camera is set to UTC.
+Set this to the timezone your camera is ALWAYS in, won't work if your camera has correcly applied daylight saving times (set either automatically or manually).
+e.g.: daylight saving time always off in brussels: -tz-minutes 120
+e.g.: daylight saving time always on             : -tz-minutes 60`,
+	},
+
 	FlagRawDir:        {help: "[any] Raw directory"},
 	FlagCollectionDir: {help: "[any] Collection directory"},
 	FlagJPEGDir:       {help: "[convert] JPEG directory"},
@@ -291,6 +303,8 @@ type Flags struct {
 	time struct {
 		since, until *time.Time
 	}
+
+	tz *int
 
 	rawDir, collectionDir, jpegDir string
 
@@ -361,6 +375,15 @@ func (f *Flags) GPhotosCredentials() string   { return f.gphotos }
 func (f *Flags) GLocationCredentials() string { return f.glocation }
 
 func (f *Flags) Log() *log.Logger { return f.log }
+
+func (f *Flags) TZOffset() (offset int, ok bool) {
+	if f.tz == nil {
+		return
+	}
+	ok = true
+	offset = *f.tz
+	return
+}
 
 func (f *Flags) Filter(imp *importer.Importer) Filter {
 	if f.filter == nil {
@@ -495,6 +518,7 @@ func (f *Flags) Parse() {
 	var gphotos string
 	var glocation string
 	var since, until string
+	var tz int
 	var help bool
 	var verbose bool
 
@@ -518,6 +542,8 @@ func (f *Flags) Parse() {
 	f.fs.StringVar(&gphotos, FlagGPhotosCredentials, "", f.lists.Help(FlagGPhotosCredentials))
 	f.fs.StringVar(&glocation, FlagGLocationCredentials, "", f.lists.Help(FlagGLocationCredentials))
 
+	f.fs.IntVar(&tz, FlagCameraFixedTZ, 0, f.lists.Help(FlagCameraFixedTZ))
+
 	f.fs.IntVar(&maxWorkers, FlagMaxWorkers, 100, f.lists.Help(FlagMaxWorkers))
 
 	f.fs.StringVar(&baseDir, FlagBaseDir, "", f.lists.Help(FlagBaseDir))
@@ -536,6 +562,13 @@ func (f *Flags) Parse() {
 		f.fs.PrintDefaults()
 		os.Exit(0)
 	}
+
+	tzSet := false
+	f.fs.Visit(func(f *flag.Flag) {
+		if f.Name == FlagCameraFixedTZ {
+			tzSet = true
+		}
+	})
 
 	f.actions = commaSep(strings.Join(actions, ","))
 	if len(f.actions) == 0 {
@@ -619,6 +652,10 @@ func (f *Flags) Parse() {
 	f.gphotos = gphotos
 	f.glocation = glocation
 	f.verbose = verbose
+	f.tz = &tz
+	if !tzSet {
+		f.tz = nil
+	}
 
 	f.log = log.New(os.Stderr, "", log.LstdFlags)
 	if !verbose {

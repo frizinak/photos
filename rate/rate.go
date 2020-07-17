@@ -97,6 +97,8 @@ type Rater struct {
 
 	gErr error
 
+	tzOffset int
+
 	term struct {
 		clrRed, clrRedContrast     string
 		clrGreen, clrGreenContrast string
@@ -118,8 +120,8 @@ type Rater struct {
 	log   *log.Logger
 }
 
-func New(log *log.Logger, files []*importer.File, imp *importer.Importer) *Rater {
-	r := &Rater{files: files, log: log}
+func New(log *log.Logger, tzOffset int, files []*importer.File, imp *importer.Importer) *Rater {
+	r := &Rater{files: files, log: log, tzOffset: tzOffset}
 	r.compl.imp = imp
 
 	r.term.clrRed = "\033[48;5;124m"
@@ -574,7 +576,7 @@ func (r *Rater) fatal(err error) {
 }
 
 func (r *Rater) updateMeta(f *importer.File, mod func(*meta.Meta) (save bool, err error)) {
-	m, err := importer.EnsureMeta(f)
+	m, err := importer.EnsureMeta(f, r.tzOffset)
 	if err != nil {
 		r.fatal(err)
 		return

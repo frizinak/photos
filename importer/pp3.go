@@ -22,7 +22,7 @@ func (i *Importer) PP3ToMeta(link string) error {
 		return err
 	}
 
-	m, err := EnsureMeta(file)
+	m, err := EnsureMeta(file, i.tzOffset)
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (i *Importer) MetaToPP3(link string) error {
 		return err
 	}
 
-	meta, err := EnsureMeta(file)
+	meta, err := EnsureMeta(file, i.tzOffset)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func (i *Importer) syncMetaAndPP3(f *File) (bool, []string, error) {
 		if !os.IsNotExist(err) {
 			return false, nil, err
 		}
-		_, err := MakeMeta(f)
+		_, err := MakeMeta(f, i.tzOffset)
 		if err != nil {
 			return false, nil, err
 		}
