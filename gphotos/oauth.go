@@ -160,7 +160,9 @@ func (g *GPhotos) token(req *http.Request) error {
 	}
 
 	g.t.Access = t.Access
-	g.t.Refresh = t.Refresh
+	if t.Refresh != "" {
+		g.t.Refresh = t.Refresh
+	}
 	g.t.ExpiresIn = t.ExpiresIn
 	g.t.Scope = t.Scope
 
