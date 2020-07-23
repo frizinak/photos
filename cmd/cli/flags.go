@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"errors"
@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/frizinak/photos/cmd/flags"
 	"github.com/frizinak/photos/gtimeline"
 	"github.com/frizinak/photos/importer"
 	"github.com/frizinak/photos/meta"
@@ -55,93 +56,6 @@ func parseTime(str string, eod bool) (*time.Time, error) {
 	return nil, err
 }
 
-const (
-	FlagActions              = "action"
-	FlagFilters              = "filter"
-	FlagGT                   = "gt"
-	FlagLT                   = "lt"
-	FlagSince                = "since"
-	FlagUntil                = "until"
-	FlagTags                 = "tag"
-	FlagChecksum             = "sum"
-	FlagSizes                = "sizes"
-	FlagRawDir               = "raws"
-	FlagCollectionDir        = "collection"
-	FlagJPEGDir              = "jpegs"
-	FlagMaxWorkers           = "workers"
-	FlagBaseDir              = "base"
-	FlagSourceDir            = "source"
-	FlagAlwaysYes            = "y"
-	FlagZero                 = "0"
-	FlagNoRawPrefix          = "no-raw"
-	FlagGPhotosCredentials   = "gphotos"
-	FlagGLocationCredentials = "glocation"
-	FlagVerbose              = "v"
-	FlagCameraFixedTZ        = "tz"
-)
-
-const (
-	ActionImport       = "import"
-	ActionShow         = "show"
-	ActionShowJPEGs    = "show-jpegs"
-	ActionShowPreviews = "show-previews"
-	ActionShowLinks    = "show-links"
-	ActionShowTags     = "show-tags"
-	ActionInfo         = "info"
-	ActionLink         = "link"
-	ActionPreviews     = "previews"
-	ActionRate         = "rate"
-	ActionSyncMeta     = "sync-meta"
-	ActionRewriteMeta  = "rewrite-meta"
-	ActionConvert      = "convert"
-	ActionExec         = "exec"
-	ActionCleanup      = "cleanup"
-	ActionTagsRemove   = "remove-tags"
-	ActionTagsAdd      = "add-tags"
-	ActionGPhotos      = "gphotos"
-	ActionGLocation    = "glocation"
-
-	FilterUndeleted = "undeleted"
-	FilterDeleted   = "deleted"
-	FilterEdited    = "edited"
-	FilterUnedited  = "unedited"
-	FilterRated     = "rated"
-	FilterUnrated   = "unrated"
-)
-
-var (
-	AllActions = map[string]struct{}{
-		ActionImport:       struct{}{},
-		ActionShow:         struct{}{},
-		ActionShowPreviews: struct{}{},
-		ActionShowJPEGs:    struct{}{},
-		ActionShowLinks:    struct{}{},
-		ActionShowTags:     struct{}{},
-		ActionInfo:         struct{}{},
-		ActionLink:         struct{}{},
-		ActionPreviews:     struct{}{},
-		ActionRate:         struct{}{},
-		ActionSyncMeta:     struct{}{},
-		ActionRewriteMeta:  struct{}{},
-		ActionConvert:      struct{}{},
-		ActionExec:         struct{}{},
-		ActionCleanup:      struct{}{},
-		ActionTagsRemove:   struct{}{},
-		ActionTagsAdd:      struct{}{},
-		ActionGPhotos:      struct{}{},
-		ActionGLocation:    struct{}{},
-	}
-
-	allFilters = map[string]struct{}{
-		FilterUndeleted: struct{}{},
-		FilterDeleted:   struct{}{},
-		FilterEdited:    struct{}{},
-		FilterUnedited:  struct{}{},
-		FilterRated:     struct{}{},
-		FilterUnrated:   struct{}{},
-	}
-)
-
 type Filter func(meta.Meta, *importer.File) bool
 
 type Help struct {
@@ -172,22 +86,22 @@ type Lists map[string]Help
 func (l Lists) Help(cmd string) string { return l[cmd].String() }
 
 var lists = Lists{
-	FlagActions: {
+	flags.Actions: {
 		help: "list of actions (comma separated and/or specified multiple times)",
 		list: map[string][]string{
-			ActionImport:       {"Import media from connected camera (gphoto2) and any given directory (-source) to the directory specified with -raws"},
-			ActionShow:         {"Show raws (filter with -filter)"},
-			ActionShowPreviews: {"Show jpegs (filter with -filter) (see -no-raw)"},
-			ActionShowJPEGs:    {"Show previews (filter with -filter) (see -no-raw)"},
-			ActionShowLinks:    {"Show links (filter with -filter) (see -no-raw)"},
-			ActionShowTags:     {"Show all tags"},
-			ActionInfo:         {"Show info for given RAWs"},
-			ActionLink:         {"Create collection symlinks in the given directory (-collection)"},
-			ActionPreviews:     {"Generate simple jpeg previews (used by -action rate)"},
-			ActionRate:         {"Simple opengl window to rate / trash images (filter with -filter)"},
-			ActionSyncMeta:     {"Sync .meta file with .pp3 (file mtime determines which one is the authority) and filesystem"},
-			ActionRewriteMeta:  {"Rewrite .meta, make sure you synced first so newer pp3s are not overwritten."},
-			ActionConvert: {
+			flags.ActionImport:       {"Import media from connected camera (gphoto2) and any given directory (-source) to the directory specified with -raws"},
+			flags.ActionShow:         {"Show raws (filter with -filter)"},
+			flags.ActionShowPreviews: {"Show jpegs (filter with -filter) (see -no-raw)"},
+			flags.ActionShowJPEGs:    {"Show previews (filter with -filter) (see -no-raw)"},
+			flags.ActionShowLinks:    {"Show links (filter with -filter) (see -no-raw)"},
+			flags.ActionShowTags:     {"Show all tags"},
+			flags.ActionInfo:         {"Show info for given RAWs"},
+			flags.ActionLink:         {"Create collection symlinks in the given directory (-collection)"},
+			flags.ActionPreviews:     {"Generate simple jpeg previews (used by -action rate)"},
+			flags.ActionRate:         {"Simple opengl window to rate / trash images (filter with -filter)"},
+			flags.ActionSyncMeta:     {"Sync .meta file with .pp3 (file mtime determines which one is the authority) and filesystem"},
+			flags.ActionRewriteMeta:  {"Rewrite .meta, make sure you synced first so newer pp3s are not overwritten."},
+			flags.ActionConvert: {
 				"Convert images to jpegs resized with -sizes (filter with -filter)",
 				"These conversions are tracked in .meta i.e.:",
 				"running",
@@ -195,20 +109,20 @@ var lists = Lists{
 				"photos ... -action convert -sizes 1920 will result in only the 1920 image being tracked",
 				"an -action cleanup will result in the deletion of all 3840 images",
 			},
-			ActionExec: {
+			flags.ActionExec: {
 				"Run an external command for each file (first non flag and any further arguments, {} is replaced with the filepath)",
 				"e.g.: photos -base . -action exec -filter all wc -c {}",
 			},
-			ActionCleanup: {
+			flags.ActionCleanup: {
 				"Remove pp3s and jpegs for deleted RAWs",
 				"-filter and -lt are ignored",
 				"Images whose rating is not higher than -gt will also have their jpegs deleted.",
 				"!Note: .meta files are seen as the single source of truth, so run sync-meta before",
 			},
-			ActionTagsRemove: {"Remove tags (first non flag argument are the tags that will be removed)"},
-			ActionTagsAdd:    {"Add tag (first non flag argument are the tags that will be removed)"},
-			ActionGPhotos:    {"Upload converted photos to google photos"},
-			ActionGLocation: {
+			flags.ActionTagsRemove: {"Remove tags (first non flag argument are the tags that will be removed)"},
+			flags.ActionTagsAdd:    {"Add tag (first non flag argument are the tags that will be removed)"},
+			flags.ActionGPhotos:    {"Upload converted photos to google photos"},
+			flags.ActionGLocation: {
 				"Update meta with location information extracted from google timeline kml",
 				fmt.Sprintf("requires -glocation flag with your %s cookie value", gtimeline.SessID),
 				"!!! there is nothing safe about this, this is your google session id",
@@ -216,22 +130,22 @@ var lists = Lists{
 		},
 	},
 
-	FlagFilters: {
+	flags.Filters: {
 		help: "[any] filters (comma separated and/or specified multiple times)",
 		list: map[string][]string{
-			FilterUndeleted: {"ignore trashed/deleted files"},
-			FilterDeleted:   {"only include trashed/deleted files"},
-			FilterUnrated:   {"only include unrated files"},
-			FilterUnedited:  {"only include files with incomplete pp3s (never opened in rawtherapee)"},
-			FilterEdited:    {"only include files with complete pp3s (have been opened in rawtherapee)"},
+			flags.FilterUndeleted: {"ignore trashed/deleted files"},
+			flags.FilterDeleted:   {"only include trashed/deleted files"},
+			flags.FilterUnrated:   {"only include unrated files"},
+			flags.FilterUnedited:  {"only include files with incomplete pp3s (never opened in rawtherapee)"},
+			flags.FilterEdited:    {"only include files with complete pp3s (have been opened in rawtherapee)"},
 		},
 	},
 
-	FlagGT:    {help: "[any] additional greater than given rating filter"},
-	FlagLT:    {help: "[any] additional less than given rating filter"},
-	FlagSince: {help: "[any] additional since time filter [Y-m-d (H:M)]"},
-	FlagUntil: {help: "[any] additional until time filter [Y-m-d (H:M)]"},
-	FlagTags: {
+	flags.GT:    {help: "[any] additional greater than given rating filter"},
+	flags.LT:    {help: "[any] additional less than given rating filter"},
+	flags.Since: {help: "[any] additional since time filter [Y-m-d (H:M)]"},
+	flags.Until: {help: "[any] additional until time filter [Y-m-d (H:M)]"},
+	flags.Tags: {
 		help: `[any] additional tag filter, comma separated <or> can be specified multiple times <and>, ^ to negate a single tag
 e.g:
 photo must be tagged: (outside || sunny) && dog && !tree
@@ -242,8 +156,8 @@ special case: '*' only matches files with tags
 `,
 	},
 
-	FlagChecksum: {help: "[import] dry-run and report non-identical files with duplicate filenames"},
-	FlagSizes: {
+	flags.Checksum: {help: "[import] dry-run and report non-identical files with duplicate filenames"},
+	flags.Sizes: {
 		help: "comma separated and/or specified multiple times (e.g.: 3840,1920,800)",
 		list: map[string][]string{
 			"[convert]": {
@@ -254,7 +168,7 @@ special case: '*' only matches files with tags
 		},
 	},
 
-	FlagCameraFixedTZ: {
+	flags.CameraFixedTZ: {
 		help: `[import,rewrite-meta] timezone offset in minutes.
 Since there is no standard in exif timezone data the time we store in .meta will be off unless your camera is set to UTC.
 Set this to the timezone your camera is ALWAYS in, won't work if your camera has correcly applied daylight saving times (set either automatically or manually).
@@ -262,31 +176,31 @@ e.g.: daylight saving time always off in brussels: -tz 120
 e.g.: daylight saving time always on             : -tz 60`,
 	},
 
-	FlagRawDir:        {help: "[any] Raw directory"},
-	FlagCollectionDir: {help: "[any] Collection directory"},
-	FlagJPEGDir:       {help: "[convert] JPEG directory"},
-	FlagBaseDir: {help: `[all] Set a basedir which implies:
+	flags.RawDir:        {help: "[any] Raw directory"},
+	flags.CollectionDir: {help: "[any] Collection directory"},
+	flags.JPEGDir:       {help: "[convert] JPEG directory"},
+	flags.BaseDir: {help: `[all] Set a basedir which implies:
 -raws (if not given)       = <basedir>/Originals
 -collection (if not given) = <basedir>/Collection
 -jpegs (if not given)      = <basedir>/Converted
 -gphotos (if not given)    = <basedir>/gphotos.credentials
 `},
-	FlagGPhotosCredentials: {help: "[gphotos] path to the google credentials file"},
-	FlagGLocationCredentials: {
+	flags.GPhotosCredentials: {help: "[gphotos] path to the google credentials file"},
+	flags.GLocationCredentials: {
 		help: fmt.Sprintf(
 			"[glocation] your %s cookie value (see -action glocation)",
 			gtimeline.SessID,
 		),
 	},
 
-	FlagMaxWorkers: {help: "[all] maximum amount of threads"},
-	FlagSourceDir:  {help: "[import] filesystem paths to import from, can be specified multiple times"},
+	flags.MaxWorkers: {help: "[all] maximum amount of threads"},
+	flags.SourceDir:  {help: "[import] filesystem paths to import from, can be specified multiple times"},
 
-	FlagAlwaysYes: {help: "always answer yes"},
-	FlagZero: {help: `all stdout output will be separated by a null byte
+	flags.AlwaysYes: {help: "always answer yes"},
+	flags.Zero: {help: `all stdout output will be separated by a null byte
 e.g.: photos -base . -0 -action show-jpegs -no-raw | xargs -0 feh`},
-	FlagNoRawPrefix: {help: "[show-*] don't prefix output with the corresponding raw file"},
-	FlagVerbose:     {help: "enable verbose stderr logging"},
+	flags.NoRawPrefix: {help: "[show-*] don't prefix output with the corresponding raw file"},
+	flags.Verbose:     {help: "enable verbose stderr logging"},
 }
 
 type Flags struct {
@@ -391,30 +305,30 @@ func (f *Flags) Filter(imp *importer.Importer) Filter {
 		for _, filter := range f.filters {
 			var _f Filter
 			switch filter {
-			case FilterUndeleted:
+			case flags.FilterUndeleted:
 				_f = func(meta meta.Meta, fl *importer.File) bool {
 					return !meta.Deleted
 				}
 
-			case FilterDeleted:
+			case flags.FilterDeleted:
 				_f = func(meta meta.Meta, fl *importer.File) bool {
 					return meta.Deleted
 				}
-			case FilterRated:
+			case flags.FilterRated:
 				_f = func(meta meta.Meta, fl *importer.File) bool {
 					return meta.Rating > 0 && meta.Rating < 6
 				}
-			case FilterUnrated:
+			case flags.FilterUnrated:
 				_f = func(meta meta.Meta, fl *importer.File) bool {
 					return meta.Rating < 1 || meta.Rating > 5
 				}
-			case FilterEdited:
+			case flags.FilterEdited:
 				_f = func(meta meta.Meta, fl *importer.File) bool {
 					b, err := imp.Unedited(fl)
 					f.Exit(err)
 					return !b
 				}
-			case FilterUnedited:
+			case flags.FilterUnedited:
 				_f = func(meta meta.Meta, fl *importer.File) bool {
 					b, err := imp.Unedited(fl)
 					f.Exit(err)
@@ -523,38 +437,38 @@ func (f *Flags) Parse() {
 	var verbose bool
 
 	f.fs.BoolVar(&help, "h", false, "help")
-	f.fs.Var(&actions, FlagActions, f.lists.Help(FlagActions))
-	f.fs.Var(&filters, FlagFilters, f.lists.Help(FlagFilters))
-	f.fs.IntVar(&ratingGTFilter, FlagGT, -1, f.lists.Help(FlagGT))
-	f.fs.IntVar(&ratingLTFilter, FlagLT, 6, f.lists.Help(FlagLT))
-	f.fs.StringVar(&since, FlagSince, "", f.lists.Help(FlagSince))
-	f.fs.StringVar(&until, FlagUntil, "", f.lists.Help(FlagUntil))
+	f.fs.Var(&actions, flags.Actions, f.lists.Help(flags.Actions))
+	f.fs.Var(&filters, flags.Filters, f.lists.Help(flags.Filters))
+	f.fs.IntVar(&ratingGTFilter, flags.GT, -1, f.lists.Help(flags.GT))
+	f.fs.IntVar(&ratingLTFilter, flags.LT, 6, f.lists.Help(flags.LT))
+	f.fs.StringVar(&since, flags.Since, "", f.lists.Help(flags.Since))
+	f.fs.StringVar(&until, flags.Until, "", f.lists.Help(flags.Until))
 
-	f.fs.Var(&tags, FlagTags, f.lists.Help(FlagTags))
+	f.fs.Var(&tags, flags.Tags, f.lists.Help(flags.Tags))
 
-	f.fs.BoolVar(&checksum, FlagChecksum, false, f.lists.Help(FlagChecksum))
-	f.fs.Var(&sizes, FlagSizes, f.lists.Help(FlagSizes))
+	f.fs.BoolVar(&checksum, flags.Checksum, false, f.lists.Help(flags.Checksum))
+	f.fs.Var(&sizes, flags.Sizes, f.lists.Help(flags.Sizes))
 
-	f.fs.StringVar(&rawDir, FlagRawDir, "", f.lists.Help(FlagRawDir))
-	f.fs.StringVar(&collectionDir, FlagCollectionDir, "", f.lists.Help(FlagCollectionDir))
-	f.fs.StringVar(&jpegDir, FlagJPEGDir, "", f.lists.Help(FlagJPEGDir))
+	f.fs.StringVar(&rawDir, flags.RawDir, "", f.lists.Help(flags.RawDir))
+	f.fs.StringVar(&collectionDir, flags.CollectionDir, "", f.lists.Help(flags.CollectionDir))
+	f.fs.StringVar(&jpegDir, flags.JPEGDir, "", f.lists.Help(flags.JPEGDir))
 
-	f.fs.StringVar(&gphotos, FlagGPhotosCredentials, "", f.lists.Help(FlagGPhotosCredentials))
-	f.fs.StringVar(&glocation, FlagGLocationCredentials, "", f.lists.Help(FlagGLocationCredentials))
+	f.fs.StringVar(&gphotos, flags.GPhotosCredentials, "", f.lists.Help(flags.GPhotosCredentials))
+	f.fs.StringVar(&glocation, flags.GLocationCredentials, "", f.lists.Help(flags.GLocationCredentials))
 
-	f.fs.IntVar(&tz, FlagCameraFixedTZ, 0, f.lists.Help(FlagCameraFixedTZ))
+	f.fs.IntVar(&tz, flags.CameraFixedTZ, 0, f.lists.Help(flags.CameraFixedTZ))
 
-	f.fs.IntVar(&maxWorkers, FlagMaxWorkers, 100, f.lists.Help(FlagMaxWorkers))
+	f.fs.IntVar(&maxWorkers, flags.MaxWorkers, 100, f.lists.Help(flags.MaxWorkers))
 
-	f.fs.StringVar(&baseDir, FlagBaseDir, "", f.lists.Help(FlagBaseDir))
+	f.fs.StringVar(&baseDir, flags.BaseDir, "", f.lists.Help(flags.BaseDir))
 
-	f.fs.Var(&fsSources, FlagSourceDir, f.lists.Help(FlagSourceDir))
+	f.fs.Var(&fsSources, flags.SourceDir, f.lists.Help(flags.SourceDir))
 
-	f.fs.BoolVar(&alwaysYes, FlagAlwaysYes, false, f.lists.Help(FlagAlwaysYes))
-	f.fs.BoolVar(&zero, FlagZero, false, f.lists.Help(FlagZero))
-	f.fs.BoolVar(&noRawPrefix, FlagNoRawPrefix, false, f.lists.Help(FlagNoRawPrefix))
+	f.fs.BoolVar(&alwaysYes, flags.AlwaysYes, false, f.lists.Help(flags.AlwaysYes))
+	f.fs.BoolVar(&zero, flags.Zero, false, f.lists.Help(flags.Zero))
+	f.fs.BoolVar(&noRawPrefix, flags.NoRawPrefix, false, f.lists.Help(flags.NoRawPrefix))
 
-	f.fs.BoolVar(&verbose, FlagVerbose, false, f.lists.Help(FlagVerbose))
+	f.fs.BoolVar(&verbose, flags.Verbose, false, f.lists.Help(flags.Verbose))
 
 	f.Err(f.fs.Parse(os.Args[1:]))
 
@@ -565,25 +479,25 @@ func (f *Flags) Parse() {
 
 	tzSet := false
 	f.fs.Visit(func(f *flag.Flag) {
-		if f.Name == FlagCameraFixedTZ {
+		if f.Name == flags.CameraFixedTZ {
 			tzSet = true
 		}
 	})
 
-	f.actions = commaSep(strings.Join(actions, ","))
+	f.actions = flags.CommaSep(strings.Join(actions, ","))
 	if len(f.actions) == 0 {
 		f.Err(errors.New("no actions provided"))
 	}
 
 	for _, a := range f.actions {
-		if _, ok := AllActions[a]; !ok {
+		if _, ok := flags.AllActions[a]; !ok {
 			f.Err(fmt.Errorf("action %s does not exist", a))
 		}
 	}
 
-	f.filters = commaSep(strings.Join(filters, ","))
+	f.filters = flags.CommaSep(strings.Join(filters, ","))
 	for _, fi := range f.filters {
-		if _, ok := allFilters[fi]; !ok {
+		if _, ok := flags.AllFilters[fi]; !ok {
 			f.Err(fmt.Errorf("filter %s does not exist", fi))
 		}
 	}
@@ -611,7 +525,7 @@ func (f *Flags) Parse() {
 		f.Err(errors.New("please provide a jpeg dir"))
 	}
 
-	sints := commaSep(strings.Join(sizes, ","))
+	sints := flags.CommaSep(strings.Join(sizes, ","))
 	f.sizes = make([]int, len(sints))
 	var err error
 	for i, s := range sints {

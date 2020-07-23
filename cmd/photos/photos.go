@@ -20,6 +20,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/frizinak/photos/cmd/cli"
+	"github.com/frizinak/photos/cmd/flags"
 	"github.com/frizinak/photos/gphotos"
 	"github.com/frizinak/photos/gtimeline"
 	"github.com/frizinak/photos/importer"
@@ -62,21 +64,9 @@ func ask() string {
 	return sc.Text()
 }
 
-func commaSep(v string) []string {
-	s := strings.Split(v, ",")
-	c := make([]string, 0, len(s))
-	for _, t := range s {
-		t = strings.TrimSpace(t)
-		if t != "" {
-			c = append(c, t)
-		}
-	}
-	return c
-}
-
 func main() {
 	l := log.New(os.Stderr, "", log.LstdFlags)
-	flag := NewFlags()
+	flag := cli.NewFlags()
 	flag.Parse()
 	tzOffset, tzOffsetOK := flag.TZOffset()
 	imp := importer.New(l, flag.Log(), tzOffset, flag.RawDir(), flag.CollectionDir(), flag.JPEGDir())
@@ -205,7 +195,7 @@ func main() {
 	workNoProgress := _work(false)
 
 	cmds := map[string]func(){
-		ActionImport: func() {
+		flags.ActionImport: func() {
 			tzExit()
 			l.Println("importing")
 			for _, path := range flag.SourceDirs() {
@@ -218,13 +208,13 @@ func main() {
 			flag.Exit(imp.Import(flag.Checksum(), progress))
 			progressDone()
 		},
-		ActionShow: func() {
+		flags.ActionShow: func() {
 			all(func(f *importer.File) (bool, error) {
 				flag.Output(f.Path())
 				return true, nil
 			})
 		},
-		ActionShowPreviews: func() {
+		flags.ActionShowPreviews: func() {
 			all(func(f *importer.File) (bool, error) {
 				p := importer.PreviewFile(f)
 				_, err := os.Stat(p)
@@ -243,7 +233,7 @@ func main() {
 				return true, nil
 			})
 		},
-		ActionShowJPEGs: func() {
+		flags.ActionShowJPEGs: func() {
 			list := allMeta()
 			sort.Sort(list)
 			sizes := flag.Sizes()
@@ -267,7 +257,7 @@ func main() {
 				}
 			}
 		},
-		ActionShowLinks: func() {
+		flags.ActionShowLinks: func() {
 			list := allMeta()
 			sort.Sort(list)
 			for _, f := range list {
@@ -282,7 +272,7 @@ func main() {
 				}
 			}
 		},
-		ActionShowTags: func() {
+		flags.ActionShowTags: func() {
 			tags := make(meta.Tags, 0)
 			all(func(f *importer.File) (bool, error) {
 				m, err := importer.GetMeta(f)
@@ -296,8 +286,8 @@ func main() {
 				flag.Output(t)
 			}
 		},
-		ActionTagsAdd: func() {
-			t := commaSep(strings.Join(flag.Args(), ","))
+		flags.ActionTagsAdd: func() {
+			t := flags.CommaSep(strings.Join(flag.Args(), ","))
 			if len(t) == 0 {
 				return
 			}
@@ -311,8 +301,8 @@ func main() {
 				return importer.SaveMeta(f, m)
 			})
 		},
-		ActionTagsRemove: func() {
-			t := commaSep(strings.Join(flag.Args(), ","))
+		flags.ActionTagsRemove: func() {
+			t := flags.CommaSep(strings.Join(flag.Args(), ","))
 			if len(t) == 0 {
 				return
 			}
@@ -338,7 +328,7 @@ func main() {
 				return importer.SaveMeta(f, m)
 			})
 		},
-		ActionLink: func() {
+		flags.ActionLink: func() {
 			l.Println("linking")
 			imp.ClearCache()
 			work(100, func(f *importer.File) error {
@@ -346,7 +336,7 @@ func main() {
 			})
 			imp.ClearCache()
 		},
-		ActionPreviews: func() {
+		flags.ActionPreviews: func() {
 			l.Println("creating previews")
 			work(2, func(f *importer.File) error {
 				err := imp.EnsurePreview(f)
@@ -358,7 +348,7 @@ func main() {
 				return err
 			})
 		},
-		ActionRate: func() {
+		flags.ActionRate: func() {
 			flist := allList()
 			list := make(importer.Files, 0, len(flist))
 			for _, f := range flist {
@@ -376,13 +366,13 @@ func main() {
 
 			flag.Exit(rate.New(l, tzOffset, list, imp).Run())
 		},
-		ActionSyncMeta: func() {
+		flags.ActionSyncMeta: func() {
 			l.Println("syncing meta")
 			work(-1, func(f *importer.File) error {
 				return imp.SyncMetaAndPP3(f)
 			})
 		},
-		ActionRewriteMeta: func() {
+		flags.ActionRewriteMeta: func() {
 			tzExit()
 			l.Println("rewriting meta")
 			work(-1, func(f *importer.File) error {
@@ -390,7 +380,7 @@ func main() {
 				return err
 			})
 		},
-		ActionConvert: func() {
+		flags.ActionConvert: func() {
 			sizes := flag.Sizes()
 			if len(sizes) == 0 {
 				flag.Exit(errors.New("no sizes specified"))
@@ -400,7 +390,7 @@ func main() {
 				return imp.Convert(f, sizes)
 			})
 		},
-		ActionCleanup: func() {
+		flags.ActionCleanup: func() {
 			list, err := imp.Cleanup(flag.RatingGT())
 			flag.Exit(err)
 
@@ -417,7 +407,7 @@ func main() {
 			}
 			flag.Exit(imp.DoCleanup(list))
 		},
-		ActionInfo: func() {
+		flags.ActionInfo: func() {
 			files := flag.Args()
 			var err error
 			for i := range files {
@@ -541,7 +531,7 @@ Address: %s
 				)
 			}
 		},
-		ActionExec: func() {
+		flags.ActionExec: func() {
 			args := flag.Args()
 			if len(args) == 0 {
 				flag.Exit(errors.New("no exec command given"))
@@ -585,7 +575,7 @@ Address: %s
 			close(results)
 			<-done
 		},
-		ActionGPhotos: func() {
+		flags.ActionGPhotos: func() {
 			sizes := flag.Sizes()
 			if len(sizes) == 0 {
 				flag.Exit(errors.New("please specify all sizes that should be uploaded"))
@@ -647,7 +637,7 @@ Address: %s
 			progressDone()
 			l.Println("done")
 		},
-		ActionGLocation: func() {
+		flags.ActionGLocation: func() {
 			l.Println("gathering date information of images")
 			sess := strings.TrimSpace(flag.GLocationCredentials())
 			if sess == "" {
@@ -713,7 +703,7 @@ Address: %s
 		},
 	}
 
-	for i := range AllActions {
+	for i := range flags.AllActions {
 		if _, ok := cmds[i]; !ok {
 			flag.Exit(fmt.Errorf("[FATAL] unimplemented action %s", i))
 		}
