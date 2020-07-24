@@ -21,6 +21,7 @@ const (
 	Filters              = "filter"
 	GT                   = "gt"
 	LT                   = "lt"
+	Ext                  = "ext"
 	Since                = "since"
 	Until                = "until"
 	Tags                 = "tag"

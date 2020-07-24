@@ -710,10 +710,15 @@ Address: %s
 	}
 
 	for _, action := range flag.Actions() {
+		fil := flag.Filter(imp)
+		mfil := flag.MetaFilter(imp)
 		filter = func(f *importer.File) bool {
+			if !fil(f) {
+				return false
+			}
 			meta, err := importer.GetMeta(f)
 			flag.Exit(err)
-			return flag.Filter(imp)(meta, f)
+			return mfil(meta, f)
 		}
 
 		cmds[action]()

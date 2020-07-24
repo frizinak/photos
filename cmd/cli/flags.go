@@ -56,7 +56,8 @@ func parseTime(str string, eod bool) (*time.Time, error) {
 	return nil, err
 }
 
-type Filter func(meta.Meta, *importer.File) bool
+type MetaFilter func(meta.Meta, *importer.File) bool
+type Filter func(*importer.File) bool
 
 type Help struct {
 	help string
@@ -141,12 +142,13 @@ var lists = Lists{
 		},
 	},
 
-	flags.GT:    {help: "[any] additional greater than given rating filter"},
-	flags.LT:    {help: "[any] additional less than given rating filter"},
-	flags.Since: {help: "[any] additional since time filter [Y-m-d (H:M)]"},
-	flags.Until: {help: "[any] additional until time filter [Y-m-d (H:M)]"},
+	flags.GT:    {help: "[any] greater than given rating filter"},
+	flags.LT:    {help: "[any] less than given rating filter"},
+	flags.Ext:   {help: "[any] filter original file extension (case insensitive)"},
+	flags.Since: {help: "[any] since time filter [Y-m-d (H:M)]"},
+	flags.Until: {help: "[any] until time filter [Y-m-d (H:M)]"},
 	flags.Tags: {
-		help: `[any] additional tag filter, comma separated <or> can be specified multiple times <and>, ^ to negate a single tag
+		help: `[any] tag filter, comma separated <or> can be specified multiple times <and>, ^ to negate a single tag
 e.g:
 photo must be tagged: (outside || sunny) && dog && !tree
 -tags 'outside,sunny' -tags 'dog' -tags '^tree'
@@ -209,6 +211,7 @@ type Flags struct {
 
 	actions []string
 	filters []string
+	ext     string
 	tags    []map[string]struct{}
 	rating  struct {
 		gt, lt int
@@ -242,7 +245,12 @@ type Flags struct {
 
 	log    *log.Logger
 	output func(string)
-	filter Filter
+
+	filter     Filter
+	metafilter MetaFilter
+
+	filterFuncs  []Filter
+	mfilterFuncs []MetaFilter
 }
 
 func (f *Flags) Actions() []string { return f.actions }
@@ -299,105 +307,137 @@ func (f *Flags) TZOffset() (offset int, ok bool) {
 	return
 }
 
-func (f *Flags) Filter(imp *importer.Importer) Filter {
-	if f.filter == nil {
-		list := make([]Filter, 0, len(f.filters))
-		for _, filter := range f.filters {
-			var _f Filter
-			switch filter {
-			case flags.FilterUndeleted:
-				_f = func(meta meta.Meta, fl *importer.File) bool {
-					return !meta.Deleted
-				}
-
-			case flags.FilterDeleted:
-				_f = func(meta meta.Meta, fl *importer.File) bool {
-					return meta.Deleted
-				}
-			case flags.FilterRated:
-				_f = func(meta meta.Meta, fl *importer.File) bool {
-					return meta.Rating > 0 && meta.Rating < 6
-				}
-			case flags.FilterUnrated:
-				_f = func(meta meta.Meta, fl *importer.File) bool {
-					return meta.Rating < 1 || meta.Rating > 5
-				}
-			case flags.FilterEdited:
-				_f = func(meta meta.Meta, fl *importer.File) bool {
-					b, err := imp.Unedited(fl)
-					f.Exit(err)
-					return !b
-				}
-			case flags.FilterUnedited:
-				_f = func(meta meta.Meta, fl *importer.File) bool {
-					b, err := imp.Unedited(fl)
-					f.Exit(err)
-					return b
-				}
-			default:
-				f.Exit(fmt.Errorf("unknown filter %s", filter))
+func (f *Flags) makeFilters(imp *importer.Importer) {
+	if f.mfilterFuncs != nil {
+		return
+	}
+	mlist := make([]MetaFilter, 0, len(f.filters))
+	list := make([]Filter, 0, len(f.filters))
+	for _, filter := range f.filters {
+		var _mf MetaFilter
+		var _f Filter
+		switch filter {
+		case flags.FilterUndeleted:
+			_mf = func(meta meta.Meta, fl *importer.File) bool {
+				return !meta.Deleted
 			}
 
+		case flags.FilterDeleted:
+			_mf = func(meta meta.Meta, fl *importer.File) bool {
+				return meta.Deleted
+			}
+		case flags.FilterRated:
+			_mf = func(meta meta.Meta, fl *importer.File) bool {
+				return meta.Rating > 0 && meta.Rating < 6
+			}
+		case flags.FilterUnrated:
+			_mf = func(meta meta.Meta, fl *importer.File) bool {
+				return meta.Rating < 1 || meta.Rating > 5
+			}
+		case flags.FilterEdited:
+			_f = func(fl *importer.File) bool {
+				b, err := imp.Unedited(fl)
+				f.Exit(err)
+				return !b
+			}
+		case flags.FilterUnedited:
+			_f = func(fl *importer.File) bool {
+				b, err := imp.Unedited(fl)
+				f.Exit(err)
+				return b
+			}
+		default:
+			f.Exit(fmt.Errorf("unknown filter %s", filter))
+		}
+
+		if _f != nil {
 			list = append(list, _f)
 		}
-
-		f.filter = func(m meta.Meta, fl *importer.File) bool {
-			if m.Rating <= f.rating.gt || m.Rating >= f.rating.lt {
-				return false
-			}
-			for _, f := range list {
-				if !f(m, fl) {
-					return false
-				}
-			}
-
-			if f.time.since != nil && f.time.since.After(m.CreatedTime()) {
-				return false
-			}
-
-			if f.time.until != nil && f.time.until.Before(m.CreatedTime()) {
-				return false
-			}
-
-			tmap := m.Tags.Map()
-			for _, and := range f.tags {
-				match := false
-				if _, ok := and["-"]; ok {
-					match = len(m.Tags) == 0
-				}
-				if _, ok := and["*"]; ok {
-					if len(m.Tags) != 0 {
-						match = true
-					}
-				}
-
-				for not := range and {
-					if !strings.HasPrefix(not, "^") {
-						continue
-					}
-					match = true
-					if _, ok := tmap[not[1:]]; ok {
-						match = false
-					}
-				}
-
-				for _, t := range m.Tags {
-					if _, ok := and[t]; ok {
-						match = true
-						break
-					}
-				}
-
-				if !match {
-					return false
-				}
-			}
-
-			return true
+		if _mf != nil {
+			mlist = append(mlist, _mf)
 		}
+	}
+	f.mfilterFuncs = mlist
+	f.filterFuncs = list
+}
+
+func (f *Flags) Filter(imp *importer.Importer) Filter {
+	if f.filter != nil {
+		return f.filter
+	}
+	f.makeFilters(imp)
+	f.filter = func(fl *importer.File) bool {
+		if f.ext != "" && f.ext != strings.ToLower(filepath.Ext(fl.BaseFilename())) {
+			return false
+		}
+
+		return true
 	}
 
 	return f.filter
+}
+
+func (f *Flags) MetaFilter(imp *importer.Importer) MetaFilter {
+	if f.metafilter != nil {
+		return f.metafilter
+	}
+	f.makeFilters(imp)
+	f.metafilter = func(m meta.Meta, fl *importer.File) bool {
+		if m.Rating <= f.rating.gt || m.Rating >= f.rating.lt {
+			return false
+		}
+		for _, f := range f.mfilterFuncs {
+			if !f(m, fl) {
+				return false
+			}
+		}
+
+		if f.time.since != nil && f.time.since.After(m.CreatedTime()) {
+			return false
+		}
+
+		if f.time.until != nil && f.time.until.Before(m.CreatedTime()) {
+			return false
+		}
+
+		tmap := m.Tags.Map()
+		for _, and := range f.tags {
+			match := false
+			if _, ok := and["-"]; ok {
+				match = len(m.Tags) == 0
+			}
+			if _, ok := and["*"]; ok {
+				if len(m.Tags) != 0 {
+					match = true
+				}
+			}
+
+			for not := range and {
+				if !strings.HasPrefix(not, "^") {
+					continue
+				}
+				match = true
+				if _, ok := tmap[not[1:]]; ok {
+					match = false
+				}
+			}
+
+			for _, t := range m.Tags {
+				if _, ok := and[t]; ok {
+					match = true
+					break
+				}
+			}
+
+			if !match {
+				return false
+			}
+		}
+
+		return true
+	}
+
+	return f.metafilter
 }
 
 func (f *Flags) Err(err error) {
@@ -419,6 +459,7 @@ func (f *Flags) Parse() {
 	var filters flagStrs
 	var ratingGTFilter int
 	var ratingLTFilter int
+	var ext string
 	var baseDir string
 	var rawDir, collectionDir, jpegDir string
 	var fsSources flagStrs
@@ -441,6 +482,7 @@ func (f *Flags) Parse() {
 	f.fs.Var(&filters, flags.Filters, f.lists.Help(flags.Filters))
 	f.fs.IntVar(&ratingGTFilter, flags.GT, -1, f.lists.Help(flags.GT))
 	f.fs.IntVar(&ratingLTFilter, flags.LT, 6, f.lists.Help(flags.LT))
+	f.fs.StringVar(&ext, flags.Ext, "", f.lists.Help(flags.Ext))
 	f.fs.StringVar(&since, flags.Since, "", f.lists.Help(flags.Since))
 	f.fs.StringVar(&until, flags.Until, "", f.lists.Help(flags.Until))
 
@@ -553,6 +595,10 @@ func (f *Flags) Parse() {
 	f.Err(err)
 	f.time.until, err = parseTime(until, true)
 	f.Err(err)
+
+	if f.ext = strings.TrimLeft(strings.ToLower(ext), "."); f.ext != "" {
+		f.ext = "." + f.ext
+	}
 
 	f.sourceDirs = fsSources
 	f.rating.gt = ratingGTFilter
