@@ -6,6 +6,8 @@ import (
 	"os"
 	"sort"
 	"time"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
 type Tags []string
@@ -68,6 +70,11 @@ func (m Meta) CreatedTime() time.Time {
 	return time.Unix(m.Created, 0)
 }
 
+var j = jsoniter.Config{
+	EscapeHTML:                    false,
+	ObjectFieldMustBeSimpleString: true,
+}.Froze()
+
 func Load(path string) (Meta, error) {
 	m := Meta{}
 	f, err := os.Open(path)
@@ -75,7 +82,7 @@ func Load(path string) (Meta, error) {
 		return m, err
 	}
 	defer f.Close()
-	err = json.NewDecoder(f).Decode(&m)
+	err = j.NewDecoder(f).Decode(&m)
 	if err != nil {
 		err = fmt.Errorf("could not load meta %s: %w", path, err)
 	}
