@@ -370,6 +370,11 @@ func (f *Flags) Filter(imp *importer.Importer) Filter {
 		if f.ext != "" && f.ext != strings.ToLower(filepath.Ext(fl.BaseFilename())) {
 			return false
 		}
+		for _, f := range f.filterFuncs {
+			if !f(fl) {
+				return false
+			}
+		}
 
 		return true
 	}
