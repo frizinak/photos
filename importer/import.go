@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"bytes"
 	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
@@ -13,13 +14,23 @@ import (
 	"sync"
 )
 
-type Exists func(*File) bool
-type Add func(src string, clean *File) error
+type Exists func(*File, io.ReadSeeker) (bool, error)
+type Add func(src string, dest *File) error
 type Progress func(n, total int)
+
+type Import struct {
+	exists   Exists
+	add      Add
+	progress Progress
+}
+
+func (i *Import) Exists(f *File, r io.ReadSeeker) (bool, error) { return i.exists(f, r) }
+func (i *Import) Add(src string, dest *File) error              { return i.add(src, dest) }
+func (i *Import) Progress(n, total int)                         { i.progress(n, total) }
 
 type Backend interface {
 	Available() (bool, error)
-	Import(log *log.Logger, destination string, exists Exists, add Add, prog Progress) error
+	Import(log *log.Logger, destination string, i *Import) error
 }
 
 var (
@@ -107,32 +118,76 @@ func (i *Importer) SupportedExtList() []string {
 func (i *Importer) Import(checksum bool, progress Progress) error {
 	os.MkdirAll(i.rawDir, 0755)
 
-	exists := func(f *File) bool {
+	im := &Import{}
+	im.progress = progress
+	im.exists = func(f *File, r io.ReadSeeker) (bool, error) {
 		p := (NewFile(i.rawDir, f.bytes, f.fn)).Path()
 		s, err := os.Stat(p)
 		if os.IsNotExist(err) {
 			if checksum {
 				i.log.Printf("Would import %s from %s", p, f.Path())
 			}
-			return false
+			return false, nil
 		}
 
 		if checksum {
-			return false
+			return false, nil
 		}
 
 		if s.IsDir() || err != nil {
 			if err == nil {
 				err = fmt.Errorf("file '%s' exists as a directory", p)
 			}
-			panic(err)
+			return false, err
 		}
 
-		i.verbose.Printf("skipping %s, exists as %s", f.fn, p)
-		return true
+		// exists
+		if r == nil {
+			i.log.Printf("[WARN] skipping %s, exists as %s but file contents were not compared", f.fn, p)
+			return true, nil
+		}
+
+		ex, err := os.Open(p)
+		if err != nil {
+			return true, err
+		}
+		defer ex.Close()
+
+		const probeSize = 1024
+		const maxProbeSize = 10
+		bufEx := make([]byte, probeSize)
+		bufNw := make([]byte, probeSize)
+		probes := f.bytes / probeSize
+		if probes > maxProbeSize {
+			probes = maxProbeSize
+		}
+		jump := f.bytes / probes
+
+		var i int64
+		for ; i < f.bytes-probeSize; i += jump {
+			r.Seek(i, io.SeekStart)
+			ex.Seek(i, io.SeekStart)
+			if _, err := ex.Read(bufEx); err != nil {
+				return false, err
+			}
+
+			if _, err := r.Read(bufNw); err != nil {
+				return false, err
+			}
+
+			if !bytes.Equal(bufNw, bufEx) {
+				return true, fmt.Errorf(
+					"file %s exists but is not identical to %s\nthe file will not be imported!\nmake a manual backup of this file and wait till a solution is implemented",
+					p,
+					f.BasePath(),
+				)
+			}
+		}
+
+		return true, nil
 	}
 
-	add := func(src string, f *File) error {
+	im.add = func(src string, f *File) error {
 		if !i.supported(f.fn) {
 			return fmt.Errorf("unsupported extension %s", f.Path())
 		}
@@ -183,7 +238,7 @@ func (i *Importer) Import(checksum bool, progress Progress) error {
 		}
 
 		i.log.Printf("Importing with %s", n)
-		if err := b.Import(i.verbose, tmpdest, exists, add, progress); err != nil {
+		if err := b.Import(i.verbose, tmpdest, im); err != nil {
 			return err
 		}
 	}

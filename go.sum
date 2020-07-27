@@ -1,5 +1,11 @@
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/frizinak/gphoto2go v0.0.0-20200726152026-ac8c80ce149a h1:bh3Ouxusji4fCipaNsqi+BjQikAqfLgM8/l4mggDkgE=
+github.com/frizinak/gphoto2go v0.0.0-20200726152026-ac8c80ce149a/go.mod h1:JPIY4BwqouMp6+2BN5SU4l/42RtU3pavADGCQCxaGNU=
+github.com/frizinak/gphoto2go v0.0.0-20200726165625-5b68687d3f58 h1:pSHcAqTlFotXVV9Kby4ZwebJfqpjbMvt6t0tqTGMh2s=
+github.com/frizinak/gphoto2go v0.0.0-20200726165625-5b68687d3f58/go.mod h1:JPIY4BwqouMp6+2BN5SU4l/42RtU3pavADGCQCxaGNU=
+github.com/frizinak/gphoto2go v0.0.0-20200727084451-773cfd4f6082 h1:YK2UCcFMeo3KYiUO8jiZ3KAeJks6VKQGcfUfW272JRE=
+github.com/frizinak/gphoto2go v0.0.0-20200727084451-773cfd4f6082/go.mod h1:JPIY4BwqouMp6+2BN5SU4l/42RtU3pavADGCQCxaGNU=
 github.com/go-gl/gl v0.0.0-20190320180904-bf2b1f2f34d7 h1:SCYMcCJ89LjRGwEa0tRluNRiMjZHalQZrVrvTbPh+qw=
 github.com/go-gl/gl v0.0.0-20190320180904-bf2b1f2f34d7/go.mod h1:482civXOzJJCPzJ4ZOX/pwvXBWSnzD4OKMdH4ClKGbk=
 github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200625191551-73d3c3675aa3 h1:q521PfSp5/z6/sD9FZZOWj4d1MLmfQW8PkRnI9M6PCE=

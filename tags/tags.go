@@ -138,7 +138,6 @@ func Parse(path string) *Tags {
 		ff, err := ParseFFProbe(path)
 		return &Tags{ff: ff, err: err}
 	}
-
 }
 
 func ParseExif(path string) (*exif.Exif, error) {

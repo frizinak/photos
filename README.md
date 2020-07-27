@@ -4,7 +4,8 @@
 ## Dependencies
 
 - imagemagick         (`-action previews` if rawtherapee not in PATH)
-- gphoto2             (`-action import`)
+- libgphoto2          (`-action import`) if not compiled with `-tags gphoto2cli` (preferred)
+- gphoto2             (`-action import`) if compiled with `-tags gphoto2cli`
 - ffmpeg for .MOVs    (`-action import`, currently only uses ffprobe for metadata)
 - rawtherapee         (`-action convert`)
 

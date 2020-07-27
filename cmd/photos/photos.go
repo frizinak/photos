@@ -26,7 +26,6 @@ import (
 	"github.com/frizinak/photos/gtimeline"
 	"github.com/frizinak/photos/importer"
 	"github.com/frizinak/photos/importer/fs"
-	_ "github.com/frizinak/photos/importer/gphoto2"
 	"github.com/frizinak/photos/meta"
 	"github.com/frizinak/photos/rate"
 )

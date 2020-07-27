@@ -69,16 +69,28 @@ func (f *FS) scan(dir string, data *[]*importer.File) error {
 	return nil
 }
 
-func (f *FS) Import(log *log.Logger, destination string, exists importer.Exists, add importer.Add, prog importer.Progress) error {
+func (f *FS) Import(log *log.Logger, destination string, imp *importer.Import) error {
 	workers := 8
 	work := make(chan *importer.File, workers)
+	errs := make(chan error, workers)
 	var wg sync.WaitGroup
-	var wErr error
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
 		go func() {
 			for f := range work {
-				if exists(f) {
+				r, err := os.Open(f.BasePath())
+				if err != nil {
+					errs <- fmt.Errorf("%s could not be opened: %w", f.BasePath(), err)
+					break
+				}
+
+				exists, err := imp.Exists(f, r)
+				r.Close()
+				if err != nil {
+					errs <- err
+					break
+				}
+				if exists {
 					continue
 				}
 
@@ -86,12 +98,12 @@ func (f *FS) Import(log *log.Logger, destination string, exists importer.Exists,
 				d := importer.NewFile(destination, f.Bytes(), fn)
 				p := d.Path()
 				if err := copy(f.BasePath(), p); err != nil {
-					wErr = err
+					errs <- fmt.Errorf("%s could not be copied to %s: %w", f.BasePath(), p, err)
 					break
 				}
 
-				if err := add(p, d); err != nil {
-					wErr = err
+				if err := imp.Add(p, d); err != nil {
+					errs <- err
 					break
 				}
 			}
@@ -106,17 +118,32 @@ func (f *FS) Import(log *log.Logger, destination string, exists importer.Exists,
 	}
 
 	n := 0
+	var wErr error
+
+outer:
 	for _, f := range d {
-		if wErr != nil {
-			break
-		}
 		n++
-		prog(n, len(d))
-		work <- f
+		imp.Progress(n, len(d))
+		select {
+		case work <- f:
+			continue
+		case err := <-errs:
+			wErr = err
+			break outer
+		}
 	}
+
 	close(work)
 	wg.Wait()
-	return wErr
+	if wErr != nil {
+		return wErr
+	}
+	select {
+	case err := <-errs:
+		return err
+	default:
+		return nil
+	}
 }
 
 func copy(src, dst string) error {
