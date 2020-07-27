@@ -84,7 +84,7 @@ func (f *FS) Import(log *log.Logger, destination string, imp *importer.Import) e
 					break
 				}
 
-				exists, err := imp.Exists(f, r)
+				exists, err := imp.Exists(f, r, 100)
 				r.Close()
 				if err != nil {
 					errs <- err

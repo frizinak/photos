@@ -14,7 +14,7 @@ import (
 	"sync"
 )
 
-type Exists func(*File, io.ReadSeeker) (bool, error)
+type Exists func(*File, io.ReadSeeker, int64) (bool, error)
 type Add func(src string, dest *File) error
 type Progress func(n, total int)
 
@@ -24,9 +24,11 @@ type Import struct {
 	progress Progress
 }
 
-func (i *Import) Exists(f *File, r io.ReadSeeker) (bool, error) { return i.exists(f, r) }
-func (i *Import) Add(src string, dest *File) error              { return i.add(src, dest) }
-func (i *Import) Progress(n, total int)                         { i.progress(n, total) }
+func (i *Import) Exists(f *File, r io.ReadSeeker, maxProbes int64) (bool, error) {
+	return i.exists(f, r, maxProbes)
+}
+func (i *Import) Add(src string, dest *File) error { return i.add(src, dest) }
+func (i *Import) Progress(n, total int)            { i.progress(n, total) }
 
 type Backend interface {
 	Available() (bool, error)
@@ -120,7 +122,7 @@ func (i *Importer) Import(checksum bool, progress Progress) error {
 
 	im := &Import{}
 	im.progress = progress
-	im.exists = func(f *File, r io.ReadSeeker) (bool, error) {
+	im.exists = func(f *File, r io.ReadSeeker, maxProbes int64) (bool, error) {
 		p := (NewFile(i.rawDir, f.bytes, f.fn)).Path()
 		s, err := os.Stat(p)
 		if os.IsNotExist(err) {
@@ -154,12 +156,11 @@ func (i *Importer) Import(checksum bool, progress Progress) error {
 		defer ex.Close()
 
 		const probeSize = 1024
-		const maxProbeSize = 10
 		bufEx := make([]byte, probeSize)
 		bufNw := make([]byte, probeSize)
 		probes := f.bytes / probeSize
-		if probes > maxProbeSize {
-			probes = maxProbeSize
+		if probes > maxProbes {
+			probes = maxProbes
 		}
 		jump := f.bytes / probes
 

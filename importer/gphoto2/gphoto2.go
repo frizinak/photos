@@ -157,7 +157,7 @@ func (g *GPhoto2) Import(log *log.Logger, destination string, imp *importer.Impo
 		}
 
 		file := importer.NewFile(currentDir, byt, currentFile)
-		exists, err := imp.Exists(file, nil)
+		exists, err := imp.Exists(file, nil, 10)
 		if err != nil {
 			return err
 		}

@@ -101,7 +101,7 @@ func (l *LibGPhoto2) Import(
 	for _, f := range files {
 		r := l.cam.ReadSeeker(f.dir, f.name)
 		file := importer.NewFile(f.dir, f.size, f.name)
-		exists, err := imp.Exists(file, r)
+		exists, err := imp.Exists(file, r, 10)
 		r.Close()
 		if err != nil {
 			return err
