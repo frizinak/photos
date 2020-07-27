@@ -43,7 +43,7 @@ func (l *LibGPhoto2) close() error {
 
 func (l *LibGPhoto2) Available() (bool, error) {
 	if err := l.init(); err != nil {
-		if e, ok := err.(*gp2.Error); ok && e.IsModelNotFound() {
+		if e, ok := err.(*gp2.Error); ok && (e.Is(gp2.ErrModelNotFound) || e.Is(gp2.ErrNotSupported)) {
 			return false, nil
 		}
 		return false, err
