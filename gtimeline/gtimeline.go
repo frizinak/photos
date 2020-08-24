@@ -10,7 +10,7 @@ import (
 )
 
 const SessID = "__Secure-3PSID"
-const klmURL = "https://www.google.com/maps/timeline/kml?authuser=0&pb=!1m8!1m3!1i%d!2i%d!3i%d!2m3!1i%d!2i%d!3i%d"
+const kmlURL = "https://www.google.com/maps/timeline/kml?authuser=0&pb=!1m8!1m3!1i%d!2i%d!3i%d!2m3!1i%d!2i%d!3i%d"
 
 var day = 24 * time.Hour
 
@@ -20,7 +20,7 @@ type data struct {
 
 func URL(day time.Time) string {
 	y, m, d := day.Year(), day.Month()-1, day.Day()
-	return fmt.Sprintf(klmURL, y, m, d, y, m, d)
+	return fmt.Sprintf(kmlURL, y, m, d, y, m, d)
 }
 
 func Get(day time.Time, secure3PSID string) (Document, error) {
