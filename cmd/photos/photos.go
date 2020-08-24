@@ -38,9 +38,17 @@ type FileMeta struct {
 
 type FileMetas []*FileMeta
 
-func (f FileMetas) Len() int           { return len(f) }
-func (f FileMetas) Swap(i, j int)      { f[i], f[j] = f[j], f[i] }
-func (f FileMetas) Less(i, j int) bool { return f[i].d.Before(f[j].d) }
+func (f FileMetas) Len() int      { return len(f) }
+func (f FileMetas) Swap(i, j int) { f[i], f[j] = f[j], f[i] }
+func (f FileMetas) Less(i, j int) bool {
+	if f[i].d == f[j].d {
+		if f[i].f.BaseFilename() < f[j].f.BaseFilename() {
+			return true
+		}
+	}
+
+	return f[i].d.Before(f[j].d)
+}
 
 func combine(files importer.Files) (FileMetas, error) {
 	m := make(FileMetas, len(files))
