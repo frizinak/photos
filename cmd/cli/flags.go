@@ -84,7 +84,7 @@ func (h Help) String() string {
 
 type Lists map[string]Help
 
-func (l Lists) Help(cmd string) string { return l[cmd].String() }
+func (l Lists) Help(cmd string) string { return l[cmd].String() + "\n" }
 
 var lists = Lists{
 	flags.Actions: {
@@ -154,8 +154,7 @@ photo must be tagged: (outside || sunny) && dog && !tree
 -tags 'outside,sunny' -tags 'dog' -tags '^tree'
 
 special case: '-' only matches files with no tags
-special case: '*' only matches files with tags
-`,
+special case: '*' only matches files with tags`,
 	},
 
 	flags.Checksum: {help: "[import] dry-run and report non-identical files with duplicate filenames"},
@@ -185,8 +184,7 @@ e.g.: daylight saving time always on             : -tz 60`,
 -raws (if not given)       = <basedir>/Originals
 -collection (if not given) = <basedir>/Collection
 -jpegs (if not given)      = <basedir>/Converted
--gphotos (if not given)    = <basedir>/gphotos.credentials
-`},
+-gphotos (if not given)    = <basedir>/gphotos.credentials`},
 	flags.GPhotosCredentials: {help: "[gphotos] path to the google credentials file"},
 	flags.GLocationCredentials: {
 		help: fmt.Sprintf(
