@@ -67,10 +67,10 @@ which defaults to
 
 ## Install
 
-`go get -u github.com/frizinak/photos/cmd/photos`
+`go install github.com/frizinak/photos/cmd/photos@latest`
 
 ## Bash completion
 
-`go get -u github.com/frizinak/photos/cmd/photos_completion`
+`go install github.com/frizinak/photos/cmd/photos_completion@latest`
 
 `complete -C photos_completion -o default photos`
