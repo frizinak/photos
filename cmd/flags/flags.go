@@ -17,29 +17,29 @@ func CommaSep(v string) []string {
 }
 
 const (
-	Actions              = "action"
-	Filters              = "filter"
-	GT                   = "gt"
-	LT                   = "lt"
-	Ext                  = "ext"
-	Since                = "since"
-	Until                = "until"
-	Tags                 = "tag"
-	Checksum             = "sum"
-	Sizes                = "sizes"
-	RawDir               = "raws"
-	CollectionDir        = "collection"
-	JPEGDir              = "jpegs"
-	MaxWorkers           = "workers"
-	BaseDir              = "base"
-	SourceDir            = "source"
-	AlwaysYes            = "y"
-	Zero                 = "0"
-	NoRawPrefix          = "no-raw"
-	GPhotosCredentials   = "gphotos"
-	GLocationCredentials = "glocation"
-	Verbose              = "v"
-	CameraFixedTZ        = "tz"
+	Actions            = "action"
+	Filters            = "filter"
+	GT                 = "gt"
+	LT                 = "lt"
+	Ext                = "ext"
+	Since              = "since"
+	Until              = "until"
+	Tags               = "tag"
+	Checksum           = "sum"
+	Sizes              = "sizes"
+	RawDir             = "raws"
+	CollectionDir      = "collection"
+	JPEGDir            = "jpegs"
+	MaxWorkers         = "workers"
+	BaseDir            = "base"
+	SourceDir          = "source"
+	AlwaysYes          = "y"
+	Zero               = "0"
+	NoRawPrefix        = "no-raw"
+	GPhotosCredentials = "gphotos"
+	GLocationDirectory = "glocation"
+	Verbose            = "v"
+	CameraFixedTZ      = "tz"
 )
 
 const (
@@ -63,38 +63,40 @@ const (
 	ActionGPhotos      = "gphotos"
 	ActionGLocation    = "glocation"
 
-	FilterUndeleted = "undeleted"
-	FilterDeleted   = "deleted"
-	FilterEdited    = "edited"
-	FilterUnedited  = "unedited"
-	FilterRated     = "rated"
-	FilterUnrated   = "unrated"
+	FilterUndeleted  = "undeleted"
+	FilterDeleted    = "deleted"
+	FilterEdited     = "edited"
+	FilterUnedited   = "unedited"
+	FilterRated      = "rated"
+	FilterUnrated    = "unrated"
+	FilterLocation   = "location"
+	FilterNoLocation = "nolocation"
 )
 
 var (
 	AllFlags = map[string]struct{}{
-		Actions:              struct{}{},
-		Filters:              struct{}{},
-		GT:                   struct{}{},
-		LT:                   struct{}{},
-		Since:                struct{}{},
-		Until:                struct{}{},
-		Tags:                 struct{}{},
-		Checksum:             struct{}{},
-		Sizes:                struct{}{},
-		RawDir:               struct{}{},
-		CollectionDir:        struct{}{},
-		JPEGDir:              struct{}{},
-		MaxWorkers:           struct{}{},
-		BaseDir:              struct{}{},
-		SourceDir:            struct{}{},
-		AlwaysYes:            struct{}{},
-		Zero:                 struct{}{},
-		NoRawPrefix:          struct{}{},
-		GPhotosCredentials:   struct{}{},
-		GLocationCredentials: struct{}{},
-		Verbose:              struct{}{},
-		CameraFixedTZ:        struct{}{},
+		Actions:            struct{}{},
+		Filters:            struct{}{},
+		GT:                 struct{}{},
+		LT:                 struct{}{},
+		Since:              struct{}{},
+		Until:              struct{}{},
+		Tags:               struct{}{},
+		Checksum:           struct{}{},
+		Sizes:              struct{}{},
+		RawDir:             struct{}{},
+		CollectionDir:      struct{}{},
+		JPEGDir:            struct{}{},
+		MaxWorkers:         struct{}{},
+		BaseDir:            struct{}{},
+		SourceDir:          struct{}{},
+		AlwaysYes:          struct{}{},
+		Zero:               struct{}{},
+		NoRawPrefix:        struct{}{},
+		GPhotosCredentials: struct{}{},
+		GLocationDirectory: struct{}{},
+		Verbose:            struct{}{},
+		CameraFixedTZ:      struct{}{},
 	}
 
 	AllActions = map[string]struct{}{
@@ -120,11 +122,13 @@ var (
 	}
 
 	AllFilters = map[string]struct{}{
-		FilterUndeleted: struct{}{},
-		FilterDeleted:   struct{}{},
-		FilterEdited:    struct{}{},
-		FilterUnedited:  struct{}{},
-		FilterRated:     struct{}{},
-		FilterUnrated:   struct{}{},
+		FilterUndeleted:  struct{}{},
+		FilterDeleted:    struct{}{},
+		FilterEdited:     struct{}{},
+		FilterUnedited:   struct{}{},
+		FilterRated:      struct{}{},
+		FilterUnrated:    struct{}{},
+		FilterLocation:   struct{}{},
+		FilterNoLocation: struct{}{},
 	}
 )

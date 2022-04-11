@@ -4,12 +4,13 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
 
-const SessID = "__Secure-3PSID"
 const kmlURL = "https://www.google.com/maps/timeline/kml?authuser=0&pb=!1m8!1m3!1i%d!2i%d!3i%d!2m3!1i%d!2i%d!3i%d"
 
 var day = 24 * time.Hour
@@ -23,21 +24,15 @@ func URL(day time.Time) string {
 	return fmt.Sprintf(kmlURL, y, m, d, y, m, d)
 }
 
-func Get(day time.Time, secure3PSID string) (Document, error) {
+func Get(filepath string) (Document, error) {
 	d := data{}
-	req, err := http.NewRequest("GET", URL(day), nil)
+	f, err := os.Open(filepath)
 	if err != nil {
 		return d.Document, err
 	}
-	req.AddCookie(&http.Cookie{Name: SessID, Value: secure3PSID})
+	defer f.Close()
 
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return d.Document, err
-	}
-	defer res.Body.Close()
-
-	dec := xml.NewDecoder(res.Body)
+	dec := xml.NewDecoder(f)
 	if _, err = dec.Token(); err != nil {
 		return d.Document, err
 	}
@@ -46,13 +41,13 @@ func Get(day time.Time, secure3PSID string) (Document, error) {
 }
 
 type Documents struct {
-	sessid string
-	d      map[string]Document
-	rw     sync.RWMutex
+	d   map[string]Document
+	dir string
+	rw  sync.RWMutex
 }
 
-func New(secure3PSID string) *Documents {
-	return &Documents{sessid: secure3PSID, d: make(map[string]Document)}
+func New(directory string) *Documents {
+	return &Documents{dir: directory, d: make(map[string]Document)}
 }
 
 func (d *Documents) key(day time.Time) string { return day.Format("20060102") }
@@ -137,7 +132,10 @@ func (d *Documents) Get(day time.Time) (Document, error) {
 	}
 	d.rw.RUnlock()
 
-	doc, err := Get(day, d.sessid)
+	doc, err := Get(filepath.Join(d.dir, day.Format("history-2006-01-02.kml")))
+	if os.IsNotExist(err) {
+		err = fmt.Errorf("KML for %s not found, download KML from:\n%s", day.Format("2006-01-02"), URL(day))
+	}
 	if err != nil {
 		return doc, err
 	}
@@ -193,35 +191,26 @@ func (d *Documents) GetDayRange(start, end time.Time, concurrent int, progress f
 		done <- struct{}{}
 	}()
 
-	var gerr error
+	errList := make([]string, 0)
+	go func() {
+		for err := range errs {
+			errList = append(errList, err.Error())
+		}
+	}()
 
 	total = int(float64(end.Sub(start))/float64(day)) + 1
 	progress(0, total)
 
-outer:
 	for s := start; !s.After(end); s = s.Add(day) {
-	inner:
-		for {
-			select {
-			case gerr = <-errs:
-				break outer
-			case work <- s:
-				break inner
-			}
-		}
+		work <- s
 	}
-
 	close(work)
 	wg.Wait()
 	close(results)
-	if gerr != nil {
-		return docs, gerr
-	}
-
-	select {
-	case err := <-errs:
+	<-done
+	if len(errList) != 0 {
+		err := errors.New(strings.Join(errList, "\n"))
 		return docs, err
-	case <-done:
 	}
 
 	return docs, nil

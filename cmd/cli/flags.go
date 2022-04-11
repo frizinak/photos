@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/frizinak/photos/cmd/flags"
-	"github.com/frizinak/photos/gtimeline"
 	"github.com/frizinak/photos/importer"
 	"github.com/frizinak/photos/meta"
 )
@@ -124,9 +123,8 @@ var lists = Lists{
 			flags.ActionTagsAdd:    {"Add tag (first non flag argument are the tags that will be removed)"},
 			flags.ActionGPhotos:    {"Upload converted photos to google photos"},
 			flags.ActionGLocation: {
-				"Update meta with location information extracted from google timeline kml",
-				fmt.Sprintf("requires -glocation flag with your %s cookie value", gtimeline.SessID),
-				"!!! there is nothing safe about this, this is your google session id",
+				"Update meta with location information extracted from google timeline kmls",
+				"requires -glocation flag with a directory where you downloaded history-YYYY-MM-DD.kml files",
 			},
 		},
 	},
@@ -134,11 +132,14 @@ var lists = Lists{
 	flags.Filters: {
 		help: "[any] filters (comma separated and/or specified multiple times)",
 		list: map[string][]string{
-			flags.FilterUndeleted: {"ignore trashed/deleted files"},
-			flags.FilterDeleted:   {"only include trashed/deleted files"},
-			flags.FilterUnrated:   {"only include unrated files"},
-			flags.FilterUnedited:  {"only include files with incomplete pp3s (never opened in rawtherapee)"},
-			flags.FilterEdited:    {"only include files with complete pp3s (have been opened in rawtherapee)"},
+			flags.FilterUndeleted:  {"ignore trashed/deleted files"},
+			flags.FilterDeleted:    {"only include trashed/deleted files"},
+			flags.FilterUnedited:   {"only include files with incomplete pp3s (never opened in rawtherapee)"},
+			flags.FilterEdited:     {"only include files with complete pp3s (have been opened in rawtherapee)"},
+			flags.FilterRated:      {"only include rated files"},
+			flags.FilterUnrated:    {"only include unrated files"},
+			flags.FilterLocation:   {"only include files with a location"},
+			flags.FilterNoLocation: {"only include files with no location"},
 		},
 	},
 
@@ -186,11 +187,8 @@ e.g.: daylight saving time always on             : -tz 60`,
 -jpegs (if not given)      = <basedir>/Converted
 -gphotos (if not given)    = <basedir>/gphotos.credentials`},
 	flags.GPhotosCredentials: {help: "[gphotos] path to the google credentials file"},
-	flags.GLocationCredentials: {
-		help: fmt.Sprintf(
-			"[glocation] your %s cookie value (see -action glocation)",
-			gtimeline.SessID,
-		),
+	flags.GLocationDirectory: {
+		help: "[glocation] directory holding history-YYYY-MM-DD.kml files",
 	},
 
 	flags.MaxWorkers: {help: "[all] maximum amount of threads"},
@@ -291,8 +289,8 @@ func (f *Flags) RatingLT() int { return f.rating.lt }
 
 func (f *Flags) Verbose() bool { return f.verbose }
 
-func (f *Flags) GPhotosCredentials() string   { return f.gphotos }
-func (f *Flags) GLocationCredentials() string { return f.glocation }
+func (f *Flags) GPhotosCredentials() string { return f.gphotos }
+func (f *Flags) GLocationDirectory() string { return f.glocation }
 
 func (f *Flags) Log() *log.Logger { return f.log }
 
@@ -343,6 +341,14 @@ func (f *Flags) makeFilters(imp *importer.Importer) {
 				b, err := imp.Unedited(fl)
 				f.Exit(err)
 				return b
+			}
+		case flags.FilterLocation:
+			_mf = func(meta meta.Meta, fl *importer.File) bool {
+				return meta.Location != nil
+			}
+		case flags.FilterNoLocation:
+			_mf = func(meta meta.Meta, fl *importer.File) bool {
+				return meta.Location == nil
 			}
 		default:
 			f.Exit(fmt.Errorf("unknown filter %s", filter))
@@ -499,7 +505,7 @@ func (f *Flags) Parse() {
 	f.fs.StringVar(&jpegDir, flags.JPEGDir, "", f.lists.Help(flags.JPEGDir))
 
 	f.fs.StringVar(&gphotos, flags.GPhotosCredentials, "", f.lists.Help(flags.GPhotosCredentials))
-	f.fs.StringVar(&glocation, flags.GLocationCredentials, "", f.lists.Help(flags.GLocationCredentials))
+	f.fs.StringVar(&glocation, flags.GLocationDirectory, "", f.lists.Help(flags.GLocationDirectory))
 
 	f.fs.IntVar(&tz, flags.CameraFixedTZ, 0, f.lists.Help(flags.CameraFixedTZ))
 

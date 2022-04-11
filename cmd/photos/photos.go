@@ -646,12 +646,12 @@ Address: %s
 		},
 		flags.ActionGLocation: func() {
 			l.Println("gathering date information of images")
-			sess := strings.TrimSpace(flag.GLocationCredentials())
-			if sess == "" {
-				flag.Exit(fmt.Errorf("please provide your google timeline session id (%s)", gtimeline.SessID))
+			glocationDir := strings.TrimSpace(flag.GLocationDirectory())
+			if glocationDir == "" {
+				flag.Exit(fmt.Errorf("please provide a directory containing your downloaded location kmls"))
 			}
 
-			docs := gtimeline.New(sess)
+			docs := gtimeline.New(glocationDir)
 			var first, last time.Time
 			work(100, func(f *importer.File) error {
 				m, err := importer.GetMeta(f)
@@ -679,6 +679,9 @@ Address: %s
 			last = last.Add(time.Hour * 24 * time.Duration(extraDays))
 			_, err := docs.GetDayRange(first, last, 8, progress)
 			progressDone()
+			if err != nil {
+				err = fmt.Errorf("%s\nno locations updated", err)
+			}
 			flag.Exit(err)
 
 			l.Println("updating meta with google timeline location information")
