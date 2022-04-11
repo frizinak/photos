@@ -40,6 +40,7 @@ var (
 	backends         = map[string]Backend{}
 	alphaRE          = regexp.MustCompile(`[^A-Za-z0-9.\-_]+`)
 	supportedExtList = map[string]struct{}{
+		".raf":  struct{}{},
 		".nef":  struct{}{},
 		".jpg":  struct{}{},
 		".dng":  struct{}{},
@@ -47,6 +48,7 @@ var (
 		".mov":  struct{}{},
 	}
 	pp3ExtList = map[string]struct{}{
+		".raf":  struct{}{},
 		".nef":  struct{}{},
 		".jpg":  struct{}{},
 		".dng":  struct{}{},

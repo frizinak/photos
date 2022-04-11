@@ -13,6 +13,7 @@ type Type string
 
 const (
 	NEF  Type = "nef"
+	RAF  Type = "raf"
 	JPEG Type = "jpeg"
 	DNG  Type = "dng"
 	TIFF Type = "tiff"
@@ -23,6 +24,8 @@ func TypeForExt(ext string) (Type, error) {
 	switch strings.ToLower(ext) {
 	case ".nef":
 		t = NEF
+	case ".raf":
+		t = RAF
 	case ".dng":
 		t = DNG
 	case ".tiff":
