@@ -201,7 +201,8 @@ func (d *Documents) GetDayRange(start, end time.Time, concurrent int, progress f
 	total = int(float64(end.Sub(start))/float64(day)) + 1
 	progress(0, total)
 
-	for s := start; !s.After(end); s = s.Add(day) {
+	yd := time.Now().Add(-time.Hour * 24)
+	for s := start; !s.After(end) && s.Before(yd); s = s.Add(day) {
 		work <- s
 	}
 	close(work)
