@@ -101,6 +101,15 @@ func GetPreview(f *File) (io.ReadCloser, error) {
 	return os.Open(PreviewFile(f))
 }
 
+func (i *Importer) HasPreview(f *File) (exists, possible bool) {
+	_, err := imagemagick.TypeForExt(filepath.Ext(f.Path()))
+	if err != nil {
+		return false, false
+	}
+	_, err = GetPreview(f)
+	return err == nil, true
+}
+
 func (i *Importer) EnsurePreview(f *File) error {
 	p, err := GetPreview(f)
 	if err != nil {

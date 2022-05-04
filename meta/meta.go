@@ -29,6 +29,16 @@ func (t Tags) Unique() Tags {
 	return nt
 }
 
+func (t Tags) Contains(tag string) bool {
+	for _, t := range t {
+		if t == tag {
+			return true
+		}
+	}
+
+	return false
+}
+
 type Converted struct {
 	Hash string
 	Size int

@@ -128,14 +128,12 @@ func main() {
 	allCounted := func(it func(f *importer.File, n, total int) (bool, error)) {
 		flag.Exit(
 			imp.AllCounted(func(f *importer.File, n, total int) (bool, error) {
-				progress(n, total)
 				if !filter(f) {
 					return true, nil
 				}
 				return it(f, n, total)
 			}),
 		)
-		progressDone()
 	}
 
 	allList := func() []*importer.File {
@@ -159,8 +157,11 @@ func main() {
 		return l
 	}
 
-	_work := func(counted bool) func(int, func(*importer.File) error) {
-		return func(workers int, do func(*importer.File) error) {
+	type workCB func() error
+	type workCheckCB func(*importer.File) (workCB, error)
+
+	_work := func(counted bool) func(int, workCheckCB) {
+		return func(workers int, do workCheckCB) {
 			if workers < 1 {
 				workers = runtime.NumCPU()
 			}
@@ -168,33 +169,69 @@ func main() {
 				workers = flag.MaxWorkers()
 			}
 			work := make(chan *importer.File, workers)
+			todo := make([]workCB, 0)
 			var wg sync.WaitGroup
 			for i := 0; i < workers; i++ {
 				wg.Add(1)
 				go func() {
 					for f := range work {
-						flag.Exit(do(f))
+						cb, err := do(f)
+						flag.Exit(err)
+						if cb != nil {
+							todo = append(todo, cb)
+						}
 					}
 					wg.Done()
 				}()
 			}
 
-			if counted {
+			var tot int
+			run := func() {
 				allCounted(func(f *importer.File, n, total int) (bool, error) {
 					work <- f
+					progress(n-len(todo), total)
+					tot = total
 					return true, nil
 				})
-				close(work)
-				wg.Wait()
-				return
+			}
+			if !counted {
+				run = func() {
+					all(func(f *importer.File) (bool, error) {
+						work <- f
+						return true, nil
+					})
+				}
 			}
 
-			all(func(f *importer.File) (bool, error) {
-				work <- f
-				return true, nil
-			})
+			run()
 			close(work)
 			wg.Wait()
+
+			var wg2 sync.WaitGroup
+			todos := make(chan workCB, workers)
+			for i := 0; i < workers; i++ {
+				wg2.Add(1)
+				go func() {
+					for f := range todos {
+						flag.Exit(f())
+					}
+					wg2.Done()
+				}()
+			}
+
+			for n, cb := range todo {
+				todos <- cb
+				if counted {
+					progress(tot-len(todo)+n+1-workers, tot)
+				}
+			}
+
+			close(todos)
+			wg2.Wait()
+			if counted {
+				progress(tot, tot)
+				progressDone()
+			}
 		}
 	}
 
@@ -298,14 +335,28 @@ func main() {
 			if len(t) == 0 {
 				return
 			}
-			work(100, func(f *importer.File) error {
+			work(100, func(f *importer.File) (workCB, error) {
 				m, err := importer.GetMeta(f)
 				if err != nil {
-					return err
+					return nil, err
 				}
 
-				m.Tags = append(m.Tags, t...)
-				return importer.SaveMeta(f, m)
+				c := true
+				for _, t := range t {
+					if !m.Tags.Contains(t) {
+						c = false
+						break
+					}
+				}
+
+				if c {
+					return nil, nil
+				}
+
+				return func() error {
+					m.Tags = append(m.Tags, t...)
+					return importer.SaveMeta(f, m)
+				}, nil
 			})
 		},
 		flags.ActionTagsRemove: func() {
@@ -319,40 +370,52 @@ func main() {
 				mp[tag] = struct{}{}
 			}
 
-			work(100, func(f *importer.File) error {
+			work(100, func(f *importer.File) (workCB, error) {
 				m, err := importer.GetMeta(f)
 				if err != nil {
-					return err
+					return nil, err
 				}
+
+				change := false
 				tags := make(meta.Tags, 0, len(m.Tags))
 				for _, tag := range m.Tags.Unique() {
 					if _, ok := mp[tag]; !ok {
+						change = true
 						tags = append(tags, tag)
 					}
 				}
+				if !change {
+					return nil, nil
+				}
 
-				m.Tags = tags
-				return importer.SaveMeta(f, m)
+				return func() error {
+					m.Tags = tags
+					return importer.SaveMeta(f, m)
+				}, nil
 			})
 		},
 		flags.ActionLink: func() {
 			l.Println("linking")
 			imp.ClearCache()
-			work(100, func(f *importer.File) error {
-				return imp.Link(f)
+			work(100, func(f *importer.File) (workCB, error) {
+				return func() error { return imp.Link(f) }, nil
 			})
 			imp.ClearCache()
 		},
 		flags.ActionPreviews: func() {
 			l.Println("creating previews")
-			work(2, func(f *importer.File) error {
-				err := imp.EnsurePreview(f)
-				if err == importer.ErrPreviewNotPossible {
-					l.Println("WARN", f.Filename(), err)
-					return nil
+			work(2, func(f *importer.File) (workCB, error) {
+				ex, can := imp.HasPreview(f)
+				if ex {
+					return nil, nil
 				}
 
-				return err
+				if !can {
+					l.Println("WARN", f.Filename(), importer.ErrPreviewNotPossible)
+					return nil, nil
+				}
+
+				return func() error { return imp.EnsurePreview(f) }, nil
 			})
 		},
 		flags.ActionRate: func() {
@@ -375,16 +438,18 @@ func main() {
 		},
 		flags.ActionSyncMeta: func() {
 			l.Println("syncing meta")
-			work(-1, func(f *importer.File) error {
-				return imp.SyncMetaAndPP3(f)
+			work(-1, func(f *importer.File) (workCB, error) {
+				return func() error { return imp.SyncMetaAndPP3(f) }, nil
 			})
 		},
 		flags.ActionRewriteMeta: func() {
 			tzExit()
 			l.Println("rewriting meta")
-			work(-1, func(f *importer.File) error {
-				_, err := importer.MakeMeta(f, tzOffset)
-				return err
+			work(-1, func(f *importer.File) (workCB, error) {
+				return func() error {
+					_, err := importer.MakeMeta(f, tzOffset)
+					return err
+				}, nil
 			})
 		},
 		flags.ActionConvert: func() {
@@ -393,8 +458,13 @@ func main() {
 				flag.Exit(errors.New("no sizes specified"))
 			}
 			l.Printf("converting (sizes: %v)", sizes)
-			work(2, func(f *importer.File) error {
-				return imp.Convert(f, sizes)
+			work(2, func(f *importer.File) (workCB, error) {
+				conv, err := imp.CheckConvert(f, sizes)
+				if err != nil || !conv {
+					return nil, err
+				}
+
+				return func() error { return imp.Convert(f, sizes) }, nil
 			})
 		},
 		flags.ActionCleanup: func() {
@@ -433,36 +503,38 @@ func main() {
 				return true
 			}
 
-			workNoProgress(100, func(f *importer.File) error {
-				fp, err := importer.Abs(f.Path())
-				if err != nil {
-					return err
-				}
-
-				met, err := importer.GetMeta(f)
-				if err != nil {
-					return err
-				}
-
-				links, err := imp.FindLinks(f)
-				if err != nil {
-					return err
-				}
-				for i := range links {
-					links[i], err = filepath.Abs(links[i])
+			workNoProgress(100, func(f *importer.File) (workCB, error) {
+				return func() error {
+					fp, err := importer.Abs(f.Path())
 					if err != nil {
 						return err
 					}
-				}
 
-				m := m{
-					met,
-					links,
-				}
-				sem.Lock()
-				fmap[fp] = m
-				sem.Unlock()
-				return nil
+					met, err := importer.GetMeta(f)
+					if err != nil {
+						return err
+					}
+
+					links, err := imp.FindLinks(f)
+					if err != nil {
+						return err
+					}
+					for i := range links {
+						links[i], err = filepath.Abs(links[i])
+						if err != nil {
+							return err
+						}
+					}
+
+					m := m{
+						met,
+						links,
+					}
+					sem.Lock()
+					fmap[fp] = m
+					sem.Unlock()
+					return nil
+				}, nil
 			})
 
 			for _, f := range files {
@@ -565,18 +637,20 @@ Address: %s
 				done <- struct{}{}
 			}()
 
-			workNoProgress(100, func(f *importer.File) error {
-				l := make([]string, len(args)-1)
-				for i := 1; i < len(args); i++ {
-					l[i-1] = strings.ReplaceAll(args[i], "{}", f.Path())
-				}
-				cmd := exec.Command(bin, l...)
-				w := w{bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil}
-				cmd.Stdout = w.out
-				cmd.Stderr = w.err
-				w.e = cmd.Run()
-				results <- w
-				return nil
+			workNoProgress(100, func(f *importer.File) (workCB, error) {
+				return func() error {
+					l := make([]string, len(args)-1)
+					for i := 1; i < len(args); i++ {
+						l[i-1] = strings.ReplaceAll(args[i], "{}", f.Path())
+					}
+					cmd := exec.Command(bin, l...)
+					w := w{bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil}
+					cmd.Stdout = w.out
+					cmd.Stderr = w.err
+					w.e = cmd.Run()
+					results <- w
+					return nil
+				}, nil
 			})
 
 			close(results)
@@ -600,30 +674,32 @@ Address: %s
 			l.Println("assembling files")
 			var sem sync.Mutex
 			list := make([]gphotos.UploadTask, 0)
-			work(100, func(f *importer.File) error {
-				m, err := importer.GetMeta(f)
-				if err != nil {
-					return err
-				}
-				for jpg, conv := range m.Conv {
-					if _, ok := smap[conv.Size]; !ok {
-						continue
+			work(100, func(f *importer.File) (workCB, error) {
+				return func() error {
+					m, err := importer.GetMeta(f)
+					if err != nil {
+						return err
 					}
-					p := filepath.Join(flag.JPEGDir(), jpg)
-					tags := []string{}
-					for _, t := range m.Tags.Unique() {
-						tags = append(tags, "+"+t)
+					for jpg, conv := range m.Conv {
+						if _, ok := smap[conv.Size]; !ok {
+							continue
+						}
+						p := filepath.Join(flag.JPEGDir(), jpg)
+						tags := []string{}
+						for _, t := range m.Tags.Unique() {
+							tags = append(tags, "+"+t)
+						}
+						descr := fmt.Sprintf("sha512:%s\nRAW:%s\n%s",
+							m.Checksum,
+							f.Filename(),
+							strings.Join(tags, " "),
+						)
+						sem.Lock()
+						list = append(list, gphotos.NewFileUploadTask(p, descr))
+						sem.Unlock()
 					}
-					descr := fmt.Sprintf("sha512:%s\nRAW:%s\n%s",
-						m.Checksum,
-						f.Filename(),
-						strings.Join(tags, " "),
-					)
-					sem.Lock()
-					list = append(list, gphotos.NewFileUploadTask(p, descr))
-					sem.Unlock()
-				}
-				return nil
+					return nil
+				}, nil
 			})
 
 			if len(list) == 0 {
@@ -653,10 +729,10 @@ Address: %s
 
 			docs := gtimeline.New(glocationDir)
 			var first, last time.Time
-			work(100, func(f *importer.File) error {
+			work(100, func(f *importer.File) (workCB, error) {
 				m, err := importer.GetMeta(f)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				t := m.CreatedTime()
 				if first == (time.Time{}) || t.Before(first) {
@@ -665,7 +741,7 @@ Address: %s
 				if last == (time.Time{}) || t.After(last) {
 					last = t
 				}
-				return nil
+				return nil, nil
 			})
 
 			if first == (time.Time{}) {
@@ -685,20 +761,20 @@ Address: %s
 			flag.Exit(err)
 
 			l.Println("updating meta with google timeline location information")
-			work(100, func(f *importer.File) error {
+			work(100, func(f *importer.File) (workCB, error) {
 				m, err := importer.GetMeta(f)
 				if err != nil {
-					return err
+					return nil, err
 				}
 
 				c := m.CreatedTime()
 				p, ll, err := docs.GetLatLng(c, extraDays)
 				if err != nil {
 					if err != gtimeline.ErrNoLatLng && err != gtimeline.ErrNoPlaceMark {
-						return err
+						return nil, err
 					}
 					l.Printf("could not find location info for %s at %s", f.Path(), c.Local())
-					return nil
+					return nil, nil
 				}
 
 				m.Location = &meta.Location{
@@ -708,7 +784,9 @@ Address: %s
 					Address: p.Address,
 				}
 
-				return importer.SaveMeta(f, m)
+				return func() error {
+					return importer.SaveMeta(f, m)
+				}, nil
 			})
 		},
 	}

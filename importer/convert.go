@@ -51,13 +51,21 @@ func (i *Importer) convert(input, output string, pp *pp3.PP3) error {
 	return nil
 }
 
-func (i *Importer) convertIfUpdated(link, dir, output string, pp *pp3.PP3, converted map[string]meta.Converted, size int) (string, error) {
+func (i *Importer) convertIfUpdated(
+	link,
+	dir,
+	output string,
+	pp *pp3.PP3,
+	converted map[string]meta.Converted,
+	size int,
+	checkOnly bool,
+) (bool, string, error) {
 	pp.ResizeLongest(size)
 	hash := pp.Hash()
 	output = fmt.Sprintf("%s.jpg", output)
 	rel, err := filepath.Rel(dir, output)
 	if err != nil {
-		return rel, err
+		return false, rel, err
 	}
 
 	_, err = os.Stat(output)
@@ -65,16 +73,19 @@ func (i *Importer) convertIfUpdated(link, dir, output string, pp *pp3.PP3, conve
 	if err == nil {
 		exists = true
 	} else if !os.IsNotExist(err) {
-		return rel, err
+		return false, rel, err
 	}
 
 	if h, ok := converted[rel]; exists && ok && h.Hash == hash {
-		return rel, nil
+		return false, rel, nil
 	}
 	converted[rel] = meta.Converted{Hash: hash, Size: size}
 
+	if checkOnly {
+		return true, rel, nil
+	}
 	os.MkdirAll(filepath.Dir(output), 0755)
-	return rel, i.convert(link, output, pp)
+	return true, rel, i.convert(link, output, pp)
 }
 
 func (i *Importer) Unedited(f *File) (bool, error) {
@@ -103,7 +114,16 @@ func pp3Edited(pp *pp3.PP3) bool {
 	return pp.Has("Exposure", "Compensation")
 }
 
+func (i *Importer) CheckConvert(f *File, sizes []int) (bool, error) {
+	return i.fileConvert(f, sizes, true)
+}
+
 func (i *Importer) Convert(f *File, sizes []int) error {
+	_, err := i.fileConvert(f, sizes, false)
+	return err
+}
+
+func (i *Importer) fileConvert(f *File, sizes []int, checkOnly bool) (bool, error) {
 	links := []string{}
 	pp3s := []*pp3.PP3{}
 	err := i.walkLinks(f, func(link string) (bool, error) {
@@ -120,16 +140,16 @@ func (i *Importer) Convert(f *File, sizes []int) error {
 		return true, err
 	})
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if len(links) == 0 {
-		return nil
+		return false, nil
 	}
 
 	m, err := GetMeta(f)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	conv := m.Conv
@@ -137,11 +157,12 @@ func (i *Importer) Convert(f *File, sizes []int) error {
 		conv = make(map[string]meta.Converted)
 	}
 	rels := make(map[string]struct{}, len(conv))
+	changed := false
 	for n, link := range links {
 		for _, s := range sizes {
 			custom, err := filepath.Rel(i.colDir, link)
 			if err != nil {
-				return err
+				return false, err
 			}
 			base := filepath.Join(i.convDir, custom)
 			dir := filepath.Dir(base)
@@ -149,9 +170,18 @@ func (i *Importer) Convert(f *File, sizes []int) error {
 			ext := filepath.Ext(fn)
 			fn = fn[0 : len(fn)-len(ext)]
 			output := filepath.Join(dir, strconv.Itoa(s), fn)
-			rel, err := i.convertIfUpdated(links[n], i.convDir, output, pp3s[n], conv, s)
+			conv, rel, err := i.convertIfUpdated(
+				links[n],
+				i.convDir,
+				output,
+				pp3s[n],
+				conv,
+				s,
+				checkOnly,
+			)
+			changed = changed || conv
 			if err != nil {
-				return err
+				return false, err
 			}
 			rels[rel] = struct{}{}
 		}
@@ -159,10 +189,16 @@ func (i *Importer) Convert(f *File, sizes []int) error {
 
 	for k := range conv {
 		if _, ok := rels[k]; !ok {
+			changed = true
 			delete(conv, k)
 		}
 	}
+
+	if checkOnly {
+		return changed, nil
+	}
+
 	m.Conv = conv
 
-	return SaveMeta(f, m)
+	return changed, SaveMeta(f, m)
 }
