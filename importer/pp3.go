@@ -134,10 +134,16 @@ func (i *Importer) syncMetaAndPP3(f *File) (bool, []string, error) {
 	last := mt[len(mt)-1]
 	meta2pp3 := make(mtimes, 0, len(mt))
 
+	for _, v := range mt {
+		if v.time == (time.Time{}) {
+			meta2pp3 = append(meta2pp3, v)
+		}
+	}
+
 	changed := false
 	switch {
 	case last.time.After(metaUpdate):
-		i.verbose.Printf("sync pp3 to meta for %s", f.Path())
+		i.verbose.Printf("sync pp3 to meta from %s to %s", last.file, f.Path())
 		changed = true
 		if err := i.PP3ToMeta(last.file); err != nil {
 			return changed, list, err
@@ -146,22 +152,28 @@ func (i *Importer) syncMetaAndPP3(f *File) (bool, []string, error) {
 			meta2pp3 = append(meta2pp3, mt[n])
 		}
 	case metaUpdate.After(last.time):
-		fallthrough
-	case last.time == time.Time{}:
-		for n := 0; n < len(mt); n++ {
-			meta2pp3 = append(meta2pp3, mt[n])
-		}
-	default:
+		meta2pp3 = append(meta2pp3, mt...)
+	}
+
+	if len(meta2pp3) == 0 {
 		return changed, list, err
 	}
 
-	if len(meta2pp3) != 0 {
-		changed = true
-		i.verbose.Printf("sync meta to pp3 for %s", f.Path())
+	uniq := make(map[string]struct{}, len(meta2pp3))
+	m2p := make(mtimes, 0, len(meta2pp3))
+	for _, v := range meta2pp3 {
+		if _, ok := uniq[v.file]; ok {
+			continue
+		}
+
+		uniq[v.file] = struct{}{}
+		m2p = append(m2p, v)
 	}
 
-	for n := range meta2pp3 {
-		if err := i.MetaToPP3(meta2pp3[n].file); err != nil {
+	changed = true
+	for _, v := range m2p {
+		i.verbose.Printf("sync meta to pp3 from %s to %s", f.Path(), v.file)
+		if err := i.MetaToPP3(v.file); err != nil {
 			return changed, list, err
 		}
 	}
