@@ -28,7 +28,7 @@ func TypeForExt(ext string) (Type, error) {
 		t = RAF
 	case ".dng":
 		t = DNG
-	case ".tiff":
+	case ".tiff", ".tif":
 		t = TIFF
 	case ".jpg", ".jpeg":
 		t = JPEG

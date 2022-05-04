@@ -45,6 +45,7 @@ var (
 		".jpg":  struct{}{},
 		".dng":  struct{}{},
 		".tiff": struct{}{},
+		".tif":  struct{}{},
 		".mov":  struct{}{},
 	}
 	pp3ExtList = map[string]struct{}{
@@ -53,6 +54,7 @@ var (
 		".jpg":  struct{}{},
 		".dng":  struct{}{},
 		".tiff": struct{}{},
+		".tif":  struct{}{},
 	}
 )
 
