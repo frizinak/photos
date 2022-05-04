@@ -1,3 +1,6 @@
+//go:build !nogl
+// +build !nogl
+
 package rate
 
 import (

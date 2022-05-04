@@ -1,3 +1,4 @@
+//go:build gphoto2cli
 // +build gphoto2cli
 
 package main

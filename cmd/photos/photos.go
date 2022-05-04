@@ -434,7 +434,9 @@ func main() {
 				return
 			}
 
-			flag.Exit(rate.New(l, tzOffset, list, imp).Run())
+			rater, err := rate.New(l, tzOffset, list, imp)
+			flag.Exit(err)
+			flag.Exit(rater.Run())
 		},
 		flags.ActionSyncMeta: func() {
 			l.Println("syncing meta")

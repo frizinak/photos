@@ -1,3 +1,6 @@
+//go:build !nogl
+// +build !nogl
+
 package rate
 
 import (
@@ -120,7 +123,7 @@ type Rater struct {
 	log   *log.Logger
 }
 
-func New(log *log.Logger, tzOffset int, files []*importer.File, imp *importer.Importer) *Rater {
+func New(log *log.Logger, tzOffset int, files []*importer.File, imp *importer.Importer) (*Rater, error) {
 	r := &Rater{files: files, log: log, tzOffset: tzOffset}
 	r.compl.imp = imp
 
@@ -141,7 +144,7 @@ func New(log *log.Logger, tzOffset int, files []*importer.File, imp *importer.Im
 
 	r.term.none = "\033[0m"
 
-	return r
+	return r, nil
 }
 
 func (r *Rater) addCompletion(str ...string) {
