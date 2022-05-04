@@ -63,7 +63,7 @@ flat:
 
 	while read line; do\
 		ln -s "$$(realpath "$$line")" Flat/;\
-	done < <($(PHOTOS_CMD) -filter undeleted -gt $(RatingGT) -action show-jpegs -no-raw -size $(FlatSize))
+	done < <($(PHOTOS_CMD) -filter undeleted -gt $(RatingGT) -action show-jpegs -no-raw -sizes $(FlatSize))
 
 ## gphotos: upload jpegs taken today to google photos
 .PHONY: gphotos
