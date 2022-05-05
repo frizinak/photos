@@ -170,6 +170,7 @@ func main() {
 			}
 			work := make(chan *importer.File, workers)
 			todo := make([]workCB, 0)
+			var sm sync.Mutex
 			var wg sync.WaitGroup
 			for i := 0; i < workers; i++ {
 				wg.Add(1)
@@ -178,7 +179,9 @@ func main() {
 						cb, err := do(f)
 						flag.Exit(err)
 						if cb != nil {
+							sm.Lock()
 							todo = append(todo, cb)
+							sm.Unlock()
 						}
 					}
 					wg.Done()
