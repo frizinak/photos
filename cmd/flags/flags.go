@@ -21,6 +21,9 @@ const (
 	Filters            = "filter"
 	GT                 = "gt"
 	LT                 = "lt"
+	Camera             = "camera"
+	Lens               = "lens"
+	Exposure           = "exposure"
 	File               = "file"
 	Ext                = "ext"
 	Since              = "since"
@@ -80,6 +83,9 @@ var (
 		Filters:            struct{}{},
 		GT:                 struct{}{},
 		LT:                 struct{}{},
+		Camera:             struct{}{},
+		Lens:               struct{}{},
+		Exposure:           struct{}{},
 		File:               struct{}{},
 		Ext:                struct{}{},
 		Since:              struct{}{},

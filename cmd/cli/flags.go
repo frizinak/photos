@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -143,8 +144,22 @@ var lists = Lists{
 		},
 	},
 
-	flags.GT:    {help: "[any] greater than given rating filter"},
-	flags.LT:    {help: "[any] less than given rating filter"},
+	flags.GT:     {help: "[any] greater than given rating filter"},
+	flags.LT:     {help: "[any] less than given rating filter"},
+	flags.Camera: {help: "[any] filter camera make and model(* as wildcard, case insensitive)"},
+	flags.Lens:   {help: "[any] filter lens make and model (* as wildcard, case insensitive)"},
+	flags.Exposure: {
+		help: "[any] filter exposure settings",
+		list: map[string][]string{
+			"example": []string{
+				"+f/2.0,-f/4.0,+1/5s,iso6400,+32mm:",
+				"  aperture between 2.0 and 4.0",
+				"  shutter speed faster than 1/5s",
+				"  iso exactly 6400",
+				"  focal length larger than 32mm",
+			},
+		},
+	},
 	flags.File:  {help: "[any] filter original filename (* as wildcard, case insensitive)"},
 	flags.Ext:   {help: "[any] filter original file extension (case insensitive)"},
 	flags.Since: {help: "[any] since time filter [Y-m-d (H:M)]"},
@@ -206,12 +221,15 @@ type Flags struct {
 	fs    *flag.FlagSet
 	lists Lists
 
-	actions []string
-	filters []string
-	ext     string
-	file    []string
-	tags    []map[string]struct{}
-	rating  struct {
+	actions  []string
+	filters  []string
+	ext      string
+	file     []string
+	camera   []string
+	lens     []string
+	exposure []string
+	tags     []map[string]struct{}
+	rating   struct {
 		gt, lt int
 	}
 
@@ -374,32 +392,10 @@ func (f *Flags) Filter(imp *importer.Importer) Filter {
 	f.makeFilters(imp)
 
 	fn := func(fl *importer.File) bool {
-		lc := strings.ToLower(fl.Filename())
-		for i, p := range f.file {
-			method := strings.Contains
-			if i == 0 {
-				method = strings.HasPrefix
-			}
-			if i == len(f.file)-1 {
-				method = strings.HasSuffix
-			}
-
-			if p == "" {
-				continue
-			}
-
-			if len(f.file) == 1 {
-				return lc == p
-			}
-
-			if !method(lc, p) {
-				return false
-			}
-		}
-		return true
+		return filterString(fl.Filename(), f.file)
 	}
 
-	if len(f.file) == 0 || (len(f.file) == 1 && f.file[0] == "") {
+	if len(f.file) == 0 {
 		fn = func(fl *importer.File) bool { return true }
 	}
 
@@ -445,6 +441,133 @@ func (f *Flags) MetaFilter(imp *importer.Importer) MetaFilter {
 
 		if f.time.until != nil && f.time.until.Before(m.CreatedTime()) {
 			return false
+		}
+
+		cnil := func() {
+			f.Err(fmt.Errorf("%s has no camera info", fl.Filename()))
+		}
+
+		if len(f.camera) != 0 {
+			if m.CameraInfo == nil {
+				cnil()
+				return false
+			}
+
+			str := fmt.Sprintf("%s %s", m.CameraInfo.Make, m.CameraInfo.Model)
+			if !filterString(str, f.camera) {
+				return false
+			}
+		}
+
+		if len(f.lens) != 0 {
+			if m.CameraInfo == nil {
+				cnil()
+				return false
+			}
+
+			str := fmt.Sprintf("%s %s", m.CameraInfo.Lens.Make, m.CameraInfo.Lens.Model)
+			if !filterString(str, f.lens) {
+				return false
+			}
+		}
+
+		if len(f.exposure) != 0 {
+			if m.CameraInfo == nil {
+				cnil()
+				return false
+			}
+
+			for _, rule := range f.exposure {
+				if len(rule) < 3 {
+					f.Err(fmt.Errorf("invalid exposure rule: '%s'", rule))
+				}
+
+				rule = strings.ToLower(rule)
+				comp := 0
+				if rule[0] == '+' {
+					rule = rule[1:]
+					comp = 1
+				} else if rule[0] == '-' {
+					rule = rule[1:]
+					comp = 2
+				}
+
+				switch {
+				case strings.Contains(rule, "f/"):
+					rule = strings.Replace(rule, "f/", "", 1)
+					fnum, err := strconv.ParseFloat(rule, 32)
+					if err != nil {
+						f.Err(fmt.Errorf("invalid aperture value: '%s'", rule))
+					}
+					switch {
+					case comp == 0 && fnum != m.CameraInfo.Aperture.Float():
+						return false
+					case comp == 1 && fnum > m.CameraInfo.Aperture.Float():
+						return false
+					case comp == 2 && fnum < m.CameraInfo.Aperture.Float():
+						return false
+					}
+				case strings.Contains(rule, "iso"):
+					rule = strings.Replace(rule, "iso", "", 1)
+					iso, err := strconv.ParseFloat(rule, 32)
+					if err != nil {
+						f.Err(fmt.Errorf("invalid iso value: '%s'", rule))
+					}
+					switch {
+					case comp == 0 && iso != float64(m.CameraInfo.ISO):
+						return false
+					case comp == 1 && iso > float64(m.CameraInfo.ISO):
+						return false
+					case comp == 2 && iso < float64(m.CameraInfo.ISO):
+						return false
+					}
+				case strings.Contains(rule, "s"):
+					rule = strings.Replace(rule, "s", "", 1)
+					p := strings.SplitN(rule, "/", 2)
+					if len(p) > 2 {
+						f.Err(fmt.Errorf("invalid shutter speed value: '%s'", rule))
+					}
+
+					nom, err := strconv.ParseFloat(p[0], 32)
+					if err != nil {
+						f.Err(fmt.Errorf("invalid shutters speed value: '%s'", rule))
+					}
+					denom := 1.0
+					if len(p) == 2 {
+						denom, err = strconv.ParseFloat(p[1], 32)
+						if err != nil {
+							f.Err(fmt.Errorf("invalid shutters speed value: '%s'", rule))
+						}
+					}
+
+					ss := nom / denom
+					switch {
+					case comp == 0 && math.Abs(ss-m.CameraInfo.ShutterSpeed.Float()) > 1.0/256000:
+						return false
+					case comp == 1 && ss < m.CameraInfo.ShutterSpeed.Float():
+						return false
+					case comp == 2 && ss > m.CameraInfo.ShutterSpeed.Float():
+						return false
+					}
+				case strings.Contains(rule, "mm"):
+					rule = strings.Replace(rule, "mm", "", 1)
+					fl, err := strconv.ParseFloat(rule, 32)
+					if err != nil {
+						f.Err(fmt.Errorf("invalid focal length value: '%s'", rule))
+					}
+					switch {
+					case comp == 0 && fl != m.CameraInfo.FocalLength.Float():
+						return false
+					case comp == 1 && fl > m.CameraInfo.FocalLength.Float():
+						return false
+					case comp == 2 && fl < m.CameraInfo.FocalLength.Float():
+						return false
+					}
+				default:
+					f.Err(fmt.Errorf("invalid exposure rule: '%s'", rule))
+				}
+
+			}
 		}
 
 		tmap := m.Tags.Map()
@@ -508,6 +631,9 @@ func (f *Flags) Parse() {
 	var ratingLTFilter int
 	var ext string
 	var file string
+	var camera string
+	var lens string
+	var exposure string
 	var baseDir string
 	var rawDir, collectionDir, jpegDir string
 	var fsSources flagStrs
@@ -532,6 +658,9 @@ func (f *Flags) Parse() {
 	f.fs.IntVar(&ratingLTFilter, flags.LT, 6, f.lists.Help(flags.LT))
 	f.fs.StringVar(&ext, flags.Ext, "", f.lists.Help(flags.Ext))
 	f.fs.StringVar(&file, flags.File, "", f.lists.Help(flags.File))
+	f.fs.StringVar(&camera, flags.Camera, "", f.lists.Help(flags.Camera))
+	f.fs.StringVar(&lens, flags.Lens, "", f.lists.Help(flags.Lens))
+	f.fs.StringVar(&exposure, flags.Exposure, "", f.lists.Help(flags.Exposure))
 	f.fs.StringVar(&since, flags.Since, "", f.lists.Help(flags.Since))
 	f.fs.StringVar(&until, flags.Until, "", f.lists.Help(flags.Until))
 
@@ -645,10 +774,32 @@ func (f *Flags) Parse() {
 	f.time.until, err = parseTime(until, true)
 	f.Err(err)
 
+	split := func(s string, wc string, cb func(string) bool) []string {
+		_list := strings.Split(strings.ToLower(s), wc)
+		list := make([]string, 0, len(_list))
+		for _, i := range _list {
+			if cb(i) {
+				list = append(list, i)
+			}
+		}
+		return list
+	}
+	always := func(string) bool { return true }
+	nonempty := func(s string) bool { return s != "" }
+	f.exposure = split(exposure, ",", nonempty)
+	if camera != "" && camera != "*" {
+		f.camera = split(camera, "*", always)
+	}
+	if lens != "" && lens != "*" {
+		f.lens = split(lens, "*", always)
+	}
+	if file != "" && file != "*" {
+		f.file = split(file, "*", func(string) bool { return true })
+	}
+
 	if f.ext = strings.TrimLeft(strings.ToLower(ext), "."); f.ext != "" {
 		f.ext = "." + f.ext
 	}
-	f.file = strings.Split(strings.ToLower(file), "*")
 
 	f.sourceDirs = fsSources
 	f.rating.gt = ratingGTFilter
@@ -671,4 +822,30 @@ func (f *Flags) Parse() {
 	if !verbose {
 		f.log = log.New(ioutil.Discard, "", 0)
 	}
+}
+
+func filterString(s string, filter []string) bool {
+	lc := strings.ToLower(s)
+	for i, p := range filter {
+		method := strings.Contains
+		if i == 0 {
+			method = strings.HasPrefix
+		}
+		if i == len(filter)-1 {
+			method = strings.HasSuffix
+		}
+
+		if p == "" {
+			continue
+		}
+
+		if len(filter) == 1 {
+			return lc == p
+		}
+
+		if !method(lc, p) {
+			return false
+		}
+	}
+	return true
 }
