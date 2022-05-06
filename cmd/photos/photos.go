@@ -422,15 +422,19 @@ func main() {
 			})
 		},
 		flags.ActionRate: func() {
-			flist := allList()
-			list := make(importer.Files, 0, len(flist))
+			flist := allMeta()
+			_list := make(FileMetas, 0, len(flist))
 			for _, f := range flist {
-				if !imp.IsImage(f.Filename()) {
+				if !imp.IsImage(f.f.Filename()) {
 					continue
 				}
-				list = append(list, f)
+				_list = append(_list, f)
 			}
-			sort.Sort(list)
+			sort.Sort(_list)
+			list := make(importer.Files, len(_list))
+			for i := range _list {
+				list[i] = _list[i].f
+			}
 
 			if len(list) == 0 {
 				l.Println("no files to rate with given filters")
@@ -587,6 +591,12 @@ func main() {
 					addr = info.m.Location.Address
 				}
 
+				var deviceStr, exposureStr string
+				if c := info.m.CameraInfo; c != nil {
+					deviceStr = c.DeviceString()
+					exposureStr = c.ExposureString()
+				}
+
 				flag.Output(
 					fmt.Sprintf(`RAW: %s
 Size: %d
@@ -596,6 +606,8 @@ Date: %s
 LatLng: %s
 Location: %s
 Address: %s
+Device: %s
+Exposure: %s
 %s
 %s
 %s
@@ -608,6 +620,8 @@ Address: %s
 						ll,
 						loc,
 						addr,
+						deviceStr,
+						exposureStr,
 						l,
 						c,
 						t,

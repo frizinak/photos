@@ -32,6 +32,10 @@ func MakeMeta(f *File, tzOffsetMinutes int) (meta.Meta, error) {
 	date := tags.Date(tzOffsetMinutes)
 	m.Created = date.Unix()
 
+	if ci, ok := tags.CameraInfo(); ok {
+		m.CameraInfo = &ci
+	}
+
 	return m, m.Save(metaFile(f))
 }
 

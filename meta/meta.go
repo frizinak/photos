@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/frizinak/photos/tags"
 	jsoniter "github.com/json-iterator/go"
 )
 
@@ -59,6 +60,8 @@ type Meta struct {
 
 	Tags     Tags
 	Location *Location
+
+	CameraInfo *tags.CameraInfo
 }
 
 type Location struct {

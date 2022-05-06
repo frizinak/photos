@@ -614,8 +614,17 @@ func (r *Rater) print(f *importer.File) {
 		tagslist[i] = fmt.Sprintf("%s%s%s\033[0m", r.term.clrBlue, r.term.clrBlueContrast, met.Tags[i])
 	}
 
+	var cameraInfo string
+	if c := met.CameraInfo; c != nil {
+		cameraInfo = fmt.Sprintf(
+			"%80s\n%80s",
+			c.DeviceString(),
+			c.ExposureString(),
+		)
+	}
+
 	fmt.Printf(
-		"\033[1m%s%s   %d/%d   \033[0m %s\n%s [%s]\n",
+		"\033[1m%s%s   %d/%d   \033[0m %s\n%s\n%80s\n%s\n",
 		r.term.clrBlue,
 		r.term.clrBlueContrast,
 		r.index+1,
@@ -623,6 +632,7 @@ func (r *Rater) print(f *importer.File) {
 		strings.Join(tagslist, " "),
 		f.Filename(),
 		filepath.Base(importer.NicePath("", f, met)),
+		cameraInfo,
 	)
 
 	delString := fmt.Sprintf("\033[1m%s%s  keep  \033[0m", r.term.clrGreen, r.term.clrGreenContrast)
