@@ -494,68 +494,16 @@ func main() {
 			flag.Exit(imp.DoCleanup(list))
 		},
 		flags.ActionInfo: func() {
-			files := flag.Args()
-			var err error
-			for i := range files {
-				files[i], err = importer.Abs(files[i])
-				flag.Exit(err)
-			}
-
-			var sem sync.Mutex
-			type m struct {
-				m     meta.Meta
-				links []string
-			}
-			fmap := make(map[string]m)
-
-			filter = func(f *importer.File) bool {
-				return true
-			}
-
-			workNoProgress(100, func(f *importer.File) (workCB, error) {
-				return func() error {
-					fp, err := importer.Abs(f.Path())
-					if err != nil {
-						return err
-					}
-
-					met, err := importer.GetMeta(f)
-					if err != nil {
-						return err
-					}
-
-					links, err := imp.FindLinks(f)
-					if err != nil {
-						return err
-					}
-					for i := range links {
-						links[i], err = filepath.Abs(links[i])
-						if err != nil {
-							return err
-						}
-					}
-
-					m := m{
-						met,
-						links,
-					}
-					sem.Lock()
-					fmap[fp] = m
-					sem.Unlock()
-					return nil
-				}, nil
-			})
+			files := allMeta()
 
 			for _, f := range files {
-				info, ok := fmap[f]
-				if !ok {
-					l.Printf("%s does not exist", f)
-					continue
-				}
-
-				links := make([]string, len(info.links))
-				for i := range info.links {
-					links[i] = fmt.Sprintf("Link[]: %s", info.links[i])
+				_links, err := imp.FindLinks(f.f)
+				flag.Exit(err)
+				links := make([]string, len(_links))
+				for i := range _links {
+					l, err := filepath.Abs(_links[i])
+					flag.Exit(err)
+					links[i] = fmt.Sprintf("Link[]: %s", l)
 				}
 
 				l := strings.Join(links, "\n")
@@ -563,15 +511,15 @@ func main() {
 					l = "Link[]:"
 				}
 
-				converted := make([]string, 0, len(info.m.Conv))
-				for i := range info.m.Conv {
+				converted := make([]string, 0, len(f.m.Conv))
+				for i := range f.m.Conv {
 					p, err := filepath.Abs(filepath.Join(flag.JPEGDir(), i))
 					flag.Exit(err)
 					converted = append(converted, fmt.Sprintf("Converted[]: %s", p))
 				}
 
-				tags := make([]string, 0, len(info.m.Tags))
-				for _, t := range info.m.Tags {
+				tags := make([]string, 0, len(f.m.Tags))
+				for _, t := range f.m.Tags {
 					tags = append(tags, fmt.Sprintf("Tags[]: %s", t))
 				}
 				t := strings.Join(tags, "\n")
@@ -585,14 +533,14 @@ func main() {
 				}
 
 				var ll, loc, addr string
-				if info.m.Location != nil {
-					ll = fmt.Sprintf("%f,%f", info.m.Location.Lat, info.m.Location.Lng)
-					loc = info.m.Location.Name
-					addr = info.m.Location.Address
+				if f.m.Location != nil {
+					ll = fmt.Sprintf("%f,%f", f.m.Location.Lat, f.m.Location.Lng)
+					loc = f.m.Location.Name
+					addr = f.m.Location.Address
 				}
 
 				var deviceStr, exposureStr string
-				if c := info.m.CameraInfo; c != nil {
+				if c := f.m.CameraInfo; c != nil {
 					deviceStr = c.DeviceString()
 					exposureStr = c.ExposureString()
 				}
@@ -612,11 +560,11 @@ Exposure: %s
 %s
 %s
 `,
-						f,
-						info.m.Size,
-						info.m.Deleted,
-						info.m.Rating,
-						info.m.CreatedTime().Format(time.RFC3339),
+						f.f.Filename(),
+						f.m.Size,
+						f.m.Deleted,
+						f.m.Rating,
+						f.m.CreatedTime().Format(time.RFC3339),
 						ll,
 						loc,
 						addr,
