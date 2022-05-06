@@ -275,9 +275,9 @@ func (i *Importer) All(it func(f *File) (bool, error)) error {
 		return err
 	}
 	defer d.Close()
-	var items []os.FileInfo
+	var items []os.DirEntry
 	for err == nil {
-		items, err = d.Readdir(20)
+		items, err = d.ReadDir(1000)
 		for _, f := range items {
 			if !i.supported(f.Name()) {
 				continue
