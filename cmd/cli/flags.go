@@ -95,7 +95,7 @@ var lists = Lists{
 			flags.ActionShowJPEGs:    {"Show previews (filter with -filter) (see -no-raw)"},
 			flags.ActionShowLinks:    {"Show links (filter with -filter) (see -no-raw)"},
 			flags.ActionShowTags:     {"Show all tags"},
-			flags.ActionInfo:         {"Show info for given RAWs"},
+			flags.ActionInfo:         {"Show info (filter with -filter)"},
 			flags.ActionLink:         {"Create collection symlinks in the given directory (-collection)"},
 			flags.ActionPreviews:     {"Generate simple jpeg previews (used by -action rate)"},
 			flags.ActionRate:         {"Simple opengl window to rate / trash images (filter with -filter)"},
@@ -145,6 +145,7 @@ var lists = Lists{
 
 	flags.GT:    {help: "[any] greater than given rating filter"},
 	flags.LT:    {help: "[any] less than given rating filter"},
+	flags.File:  {help: "[any] filter original filename (* as wildcard, case insensitive)"},
 	flags.Ext:   {help: "[any] filter original file extension (case insensitive)"},
 	flags.Since: {help: "[any] since time filter [Y-m-d (H:M)]"},
 	flags.Until: {help: "[any] until time filter [Y-m-d (H:M)]"},
@@ -208,6 +209,7 @@ type Flags struct {
 	actions []string
 	filters []string
 	ext     string
+	file    []string
 	tags    []map[string]struct{}
 	rating  struct {
 		gt, lt int
@@ -370,10 +372,46 @@ func (f *Flags) Filter(imp *importer.Importer) Filter {
 		return f.filter
 	}
 	f.makeFilters(imp)
+
+	fn := func(fl *importer.File) bool {
+		lc := strings.ToLower(fl.Filename())
+		for i, p := range f.file {
+			method := strings.Contains
+			if i == 0 {
+				method = strings.HasPrefix
+			}
+			if i == len(f.file)-1 {
+				method = strings.HasSuffix
+			}
+
+			if p == "" {
+				continue
+			}
+
+			if len(f.file) == 1 {
+				return lc == p
+			}
+
+			if !method(lc, p) {
+				return false
+			}
+		}
+		return true
+	}
+
+	if len(f.file) == 0 || (len(f.file) == 1 && f.file[0] == "") {
+		fn = func(fl *importer.File) bool { return true }
+	}
+
 	f.filter = func(fl *importer.File) bool {
 		if f.ext != "" && f.ext != strings.ToLower(filepath.Ext(fl.BaseFilename())) {
 			return false
 		}
+
+		if !fn(fl) {
+			return false
+		}
+
 		for _, f := range f.filterFuncs {
 			if !f(fl) {
 				return false
@@ -469,6 +507,7 @@ func (f *Flags) Parse() {
 	var ratingGTFilter int
 	var ratingLTFilter int
 	var ext string
+	var file string
 	var baseDir string
 	var rawDir, collectionDir, jpegDir string
 	var fsSources flagStrs
@@ -492,6 +531,7 @@ func (f *Flags) Parse() {
 	f.fs.IntVar(&ratingGTFilter, flags.GT, -1, f.lists.Help(flags.GT))
 	f.fs.IntVar(&ratingLTFilter, flags.LT, 6, f.lists.Help(flags.LT))
 	f.fs.StringVar(&ext, flags.Ext, "", f.lists.Help(flags.Ext))
+	f.fs.StringVar(&file, flags.File, "", f.lists.Help(flags.File))
 	f.fs.StringVar(&since, flags.Since, "", f.lists.Help(flags.Since))
 	f.fs.StringVar(&until, flags.Until, "", f.lists.Help(flags.Until))
 
@@ -608,6 +648,7 @@ func (f *Flags) Parse() {
 	if f.ext = strings.TrimLeft(strings.ToLower(ext), "."); f.ext != "" {
 		f.ext = "." + f.ext
 	}
+	f.file = strings.Split(strings.ToLower(file), "*")
 
 	f.sourceDirs = fsSources
 	f.rating.gt = ratingGTFilter

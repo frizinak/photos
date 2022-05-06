@@ -21,6 +21,7 @@ const (
 	Filters            = "filter"
 	GT                 = "gt"
 	LT                 = "lt"
+	File               = "file"
 	Ext                = "ext"
 	Since              = "since"
 	Until              = "until"
@@ -79,6 +80,8 @@ var (
 		Filters:            struct{}{},
 		GT:                 struct{}{},
 		LT:                 struct{}{},
+		File:               struct{}{},
+		Ext:                struct{}{},
 		Since:              struct{}{},
 		Until:              struct{}{},
 		Tags:               struct{}{},
