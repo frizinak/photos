@@ -444,7 +444,7 @@ func (f *Flags) MetaFilter(imp *importer.Importer) MetaFilter {
 		}
 
 		cnil := func() {
-			f.Err(fmt.Errorf("%s has no camera info", fl.Filename()))
+			f.log.Printf("%s has no camera info", fl.Filename())
 		}
 
 		if len(f.camera) != 0 {
