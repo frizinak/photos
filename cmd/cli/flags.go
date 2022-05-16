@@ -59,6 +59,28 @@ func parseTime(str string, eod bool) (*time.Time, error) {
 type MetaFilter func(meta.Meta, *importer.File) bool
 type Filter func(*importer.File) bool
 
+type MetaFilterWeight struct {
+	MetaFilter
+	Weight int
+}
+
+type FilterWeight struct {
+	Filter
+	Weight int
+}
+
+type fws []FilterWeight
+
+func (f fws) Len() int           { return len(f) }
+func (f fws) Less(i, j int) bool { return f[i].Weight < f[j].Weight }
+func (f fws) Swap(i, j int)      { f[i], f[j] = f[j], f[i] }
+
+type mfws []MetaFilterWeight
+
+func (f mfws) Len() int           { return len(f) }
+func (f mfws) Less(i, j int) bool { return f[i].Weight < f[j].Weight }
+func (f mfws) Swap(i, j int)      { f[i], f[j] = f[j], f[i] }
+
 type Help struct {
 	help string
 	list map[string][]string
@@ -266,8 +288,8 @@ type Flags struct {
 	filter     Filter
 	metafilter MetaFilter
 
-	filterFuncs  []Filter
-	mfilterFuncs []MetaFilter
+	filterFuncs  fws
+	mfilterFuncs mfws
 }
 
 func (f *Flags) Actions() []string { return f.actions }
@@ -328,17 +350,17 @@ func (f *Flags) makeFilters(imp *importer.Importer) {
 	if f.mfilterFuncs != nil {
 		return
 	}
-	mlist := make([]MetaFilter, 0, len(f.filters))
-	list := make([]Filter, 0, len(f.filters))
+	mlist := make(mfws, 0, len(f.filters))
+	list := make(fws, 0, len(f.filters))
 	for _, filter := range f.filters {
 		var _mf MetaFilter
 		var _f Filter
+		var weight int
 		switch filter {
 		case flags.FilterUndeleted:
 			_mf = func(meta meta.Meta, fl *importer.File) bool {
 				return !meta.Deleted
 			}
-
 		case flags.FilterDeleted:
 			_mf = func(meta meta.Meta, fl *importer.File) bool {
 				return meta.Deleted
@@ -352,19 +374,22 @@ func (f *Flags) makeFilters(imp *importer.Importer) {
 				return meta.Rating < 1 || meta.Rating > 5
 			}
 		case flags.FilterUpdated:
+			weight = 99
 			_mf = func(meta meta.Meta, fl *importer.File) bool {
 				c, err := imp.CheckConvert(fl, f.Sizes())
 				f.Exit(err)
 				return c
 			}
 		case flags.FilterEdited:
-			_f = func(fl *importer.File) bool {
+			weight = 50
+			_mf = func(meta meta.Meta, fl *importer.File) bool {
 				b, err := imp.Unedited(fl)
 				f.Exit(err)
 				return !b
 			}
 		case flags.FilterUnedited:
-			_f = func(fl *importer.File) bool {
+			weight = 50
+			_mf = func(meta meta.Meta, fl *importer.File) bool {
 				b, err := imp.Unedited(fl)
 				f.Exit(err)
 				return b
@@ -382,14 +407,17 @@ func (f *Flags) makeFilters(imp *importer.Importer) {
 		}
 
 		if _f != nil {
-			list = append(list, _f)
+			list = append(list, FilterWeight{_f, weight})
 		}
 		if _mf != nil {
-			mlist = append(mlist, _mf)
+			mlist = append(mlist, MetaFilterWeight{_mf, weight})
 		}
 	}
 	f.mfilterFuncs = mlist
 	f.filterFuncs = list
+
+	sort.Stable(f.mfilterFuncs)
+	sort.Stable(f.filterFuncs)
 }
 
 func (f *Flags) Filter(imp *importer.Importer) Filter {
@@ -416,7 +444,7 @@ func (f *Flags) Filter(imp *importer.Importer) Filter {
 		}
 
 		for _, f := range f.filterFuncs {
-			if !f(fl) {
+			if !f.Filter(fl) {
 				return false
 			}
 		}
@@ -439,13 +467,12 @@ func (f *Flags) MetaFilter(imp *importer.Importer) MetaFilter {
 		if f.time.since != nil && f.time.since.After(m.CreatedTime()) {
 			return false
 		}
-
 		if f.time.until != nil && f.time.until.Before(m.CreatedTime()) {
 			return false
 		}
 
 		for _, f := range f.mfilterFuncs {
-			if !f(m, fl) {
+			if !f.MetaFilter(m, fl) {
 				return false
 			}
 		}
