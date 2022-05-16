@@ -69,6 +69,7 @@ const (
 
 	FilterUndeleted  = "undeleted"
 	FilterDeleted    = "deleted"
+	FilterUpdated    = "updated"
 	FilterEdited     = "edited"
 	FilterUnedited   = "unedited"
 	FilterRated      = "rated"
@@ -133,6 +134,7 @@ var (
 	AllFilters = map[string]struct{}{
 		FilterUndeleted:  struct{}{},
 		FilterDeleted:    struct{}{},
+		FilterUpdated:    struct{}{},
 		FilterEdited:     struct{}{},
 		FilterUnedited:   struct{}{},
 		FilterRated:      struct{}{},

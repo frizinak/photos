@@ -129,7 +129,7 @@ func main() {
 		flag.Exit(
 			imp.AllCounted(func(f *importer.File, n, total int) (bool, error) {
 				if !filter(f) {
-					return true, nil
+					f = nil
 				}
 				return it(f, n, total)
 			}),
@@ -191,7 +191,9 @@ func main() {
 			var tot int
 			run := func() {
 				allCounted(func(f *importer.File, n, total int) (bool, error) {
-					work <- f
+					if f != nil {
+						work <- f
+					}
 					progress(n-len(todo), total)
 					tot = total
 					return true, nil
@@ -764,18 +766,28 @@ Exposure: %s
 		}
 	}
 
-	for _, action := range flag.Actions() {
-		fil := flag.Filter(imp)
-		mfil := flag.MetaFilter(imp)
-		filter = func(f *importer.File) bool {
-			if !fil(f) {
-				return false
-			}
-			meta, err := importer.GetMeta(f)
-			flag.Exit(err)
-			return mfil(meta, f)
+	fil := flag.Filter(imp)
+	mfil := flag.MetaFilter(imp)
+	fcache := map[string]bool{}
+	filter = func(f *importer.File) bool {
+		p := f.Path()
+		if v, ok := fcache[p]; ok {
+			return v
 		}
 
+		if !fil(f) {
+			fcache[p] = false
+			return false
+		}
+
+		meta, err := importer.GetMeta(f)
+		flag.Exit(err)
+		fcache[p] = mfil(meta, f)
+
+		return fcache[p]
+	}
+
+	for _, action := range flag.Actions() {
 		cmds[action]()
 	}
 }

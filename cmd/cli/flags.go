@@ -135,6 +135,7 @@ var lists = Lists{
 		list: map[string][]string{
 			flags.FilterUndeleted:  {"ignore trashed/deleted files"},
 			flags.FilterDeleted:    {"only include trashed/deleted files"},
+			flags.FilterUpdated:    {"only include files that need to be converted (updated pp3). be sure to pass the correct -sizes"},
 			flags.FilterUnedited:   {"only include files with incomplete pp3s (never opened in rawtherapee)"},
 			flags.FilterEdited:     {"only include files with complete pp3s (have been opened in rawtherapee)"},
 			flags.FilterRated:      {"only include rated files"},
@@ -350,6 +351,12 @@ func (f *Flags) makeFilters(imp *importer.Importer) {
 			_mf = func(meta meta.Meta, fl *importer.File) bool {
 				return meta.Rating < 1 || meta.Rating > 5
 			}
+		case flags.FilterUpdated:
+			_mf = func(meta meta.Meta, fl *importer.File) bool {
+				c, err := imp.CheckConvert(fl, f.Sizes())
+				f.Exit(err)
+				return c
+			}
 		case flags.FilterEdited:
 			_f = func(fl *importer.File) bool {
 				b, err := imp.Unedited(fl)
@@ -429,18 +436,18 @@ func (f *Flags) MetaFilter(imp *importer.Importer) MetaFilter {
 		if m.Rating <= f.rating.gt || m.Rating >= f.rating.lt {
 			return false
 		}
-		for _, f := range f.mfilterFuncs {
-			if !f(m, fl) {
-				return false
-			}
-		}
-
 		if f.time.since != nil && f.time.since.After(m.CreatedTime()) {
 			return false
 		}
 
 		if f.time.until != nil && f.time.until.Before(m.CreatedTime()) {
 			return false
+		}
+
+		for _, f := range f.mfilterFuncs {
+			if !f(m, fl) {
+				return false
+			}
 		}
 
 		cnil := func() {
