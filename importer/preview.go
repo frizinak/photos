@@ -106,7 +106,10 @@ func (i *Importer) HasPreview(f *File) (exists, possible bool) {
 	if err != nil {
 		return false, false
 	}
-	_, err = GetPreview(f)
+	fh, err := GetPreview(f)
+	if fh != nil {
+		fh.Close()
+	}
 	return err == nil, true
 }
 
