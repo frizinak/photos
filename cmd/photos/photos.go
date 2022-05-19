@@ -454,6 +454,24 @@ func main() {
 				}, nil
 			})
 		},
+		flags.ActionJPEGFixup: func() {
+			work(1, func(f *importer.File) (workCB, error) {
+				m, err := importer.GetMeta(f)
+				if err != nil {
+					return nil, err
+				}
+
+				return func() error {
+					for p := range m.Conv {
+						p = filepath.Join(flag.JPEGDir(), p)
+						if err := imp.FixJPEGTZ(p, m.CreatedTime()); err != nil {
+							return err
+						}
+					}
+					return nil
+				}, nil
+			})
+		},
 		flags.ActionConvert: func() {
 			sizes := flag.Sizes()
 			if len(sizes) == 0 {

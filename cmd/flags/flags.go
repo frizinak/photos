@@ -59,6 +59,7 @@ const (
 	ActionSyncMeta     = "sync-meta"
 	ActionRewriteMeta  = "rewrite-meta"
 	ActionConvert      = "convert"
+	ActionJPEGFixup    = "jpeg-fixup"
 	ActionExec         = "exec"
 	ActionCleanup      = "cleanup"
 	ActionTagsRemove   = "remove-tags"
@@ -121,6 +122,7 @@ var (
 		ActionSyncMeta:     struct{}{},
 		ActionRewriteMeta:  struct{}{},
 		ActionConvert:      struct{}{},
+		ActionJPEGFixup:    struct{}{},
 		ActionExec:         struct{}{},
 		ActionCleanup:      struct{}{},
 		ActionTagsRemove:   struct{}{},

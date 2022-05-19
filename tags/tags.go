@@ -2,7 +2,9 @@ package tags
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,51 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rwcarlsen/goexif/exif"
-	"github.com/rwcarlsen/goexif/tiff"
+	"github.com/dsoprea/go-exif/v3"
+	exifcommon "github.com/dsoprea/go-exif/v3/common"
+	jpegstructure "github.com/dsoprea/go-jpeg-image-structure/v2"
 )
-
-type parser struct {
-}
-
-const (
-	exifOffsetTime    = "OffsetTime"
-	exifOffsetTimeFB1 = "OffsetTimeFallback1"
-	exifOffsetTimeFB2 = "OffsetTimeFallback2"
-)
-
-var exifFields = map[uint16]exif.FieldName{
-	0x9010: exifOffsetTime,
-	0x9011: exifOffsetTimeFB1,
-	0x9012: exifOffsetTimeFB2,
-}
-
-func (p *parser) Parse(x *exif.Exif) error {
-	ptr, err := x.Get("ExifIFDPointer")
-	if err != nil {
-		return nil
-	}
-	offset, err := ptr.Int(0)
-	if err != nil {
-		return nil
-	}
-	r := bytes.NewReader(x.Raw)
-	_, err = r.Seek(int64(offset), io.SeekStart)
-	if err != nil {
-		return err
-	}
-	subDir, _, err := tiff.DecodeDir(r, x.Tiff.Order)
-	if err != nil {
-		return nil
-	}
-
-	x.LoadTags(subDir, exifFields, false)
-	return nil
-}
-
-func init() {
-	exif.RegisterParsers(&parser{})
-}
 
 type Aperture struct{ fraction }
 type ShutterSpeed struct{ fraction }
@@ -155,14 +116,23 @@ func (c CameraInfo) String() string {
 }
 
 type Tags struct {
-	ex  *exif.Exif
+	ex  map[uint16]exif.ExifTag
 	ff  *FFProbeInfo
 	err error
 }
 
 func (t *Tags) Err() error { return t.err }
 
-var fre = regexp.MustCompile(`^([0-9]+)/([0-9]+)$`)
+var fre = regexp.MustCompile(`^\[?([0-9]+)/([0-9]+)\]?$`)
+
+func (t *Tags) exif(f uint16) string {
+	tag, ok := t.ex[f]
+	if !ok {
+		return ""
+	}
+
+	return strings.Trim(tag.Formatted, "\" ")
+}
 
 func commonDenominator(a, b uint) uint {
 	if a == b {
@@ -186,16 +156,8 @@ func (t *Tags) CameraInfo() (CameraInfo, bool) {
 		return c, false
 	}
 
-	getstr := func(f exif.FieldName) string {
-		v, _ := t.ex.Get(f)
-		if v == nil {
-			return ""
-		}
-		return strings.Trim(v.String(), "\" ")
-	}
-
-	getf := func(f exif.FieldName) fraction {
-		v := getstr(f)
+	getf := func(f uint16) fraction {
+		v := t.exif(f)
 		sm := fre.FindStringSubmatch(v)
 		if len(sm) == 3 {
 			_nom, err := strconv.ParseUint(sm[1], 10, 64)
@@ -220,16 +182,16 @@ func (t *Tags) CameraInfo() (CameraInfo, bool) {
 		return fraction{uint(n), 1}
 	}
 
-	c.Make, c.Model = getstr(exif.Make), getstr(exif.Model)
-	c.Lens.Make, c.Lens.Model = getstr(exif.LensMake), getstr(exif.LensModel)
+	c.Make, c.Model = t.exif(0x010f), t.exif(0x0110)
+	c.Lens.Make, c.Lens.Model = t.exif(0xa433), t.exif(0xa434)
 
-	c.Aperture = Aperture{getf(exif.FNumber)}
-	c.ShutterSpeed = ShutterSpeed{getf(exif.ExposureTime)}
-	iso, err := strconv.Atoi(getstr(exif.ISOSpeedRatings))
+	c.Aperture = Aperture{getf(0x829d)}
+	c.ShutterSpeed = ShutterSpeed{getf(0x829a)}
+	iso, err := strconv.Atoi(strings.Trim(t.exif(0x8827), "[]"))
 	if err == nil {
 		c.ISO = ISO(iso)
 	}
-	c.FocalLength = FocalLength{getf(exif.FocalLength)}
+	c.FocalLength = FocalLength{getf(0x920a)}
 
 	return c, true
 }
@@ -250,49 +212,22 @@ func (t *Tags) Date() time.Time {
 
 func (t *Tags) exifDate() (time.Time, error) {
 	var dt time.Time
-	tag, err := t.ex.Get("DateTimeOriginal")
-	var offset exif.FieldName = "OffsetTimeOriginal"
-	if err != nil {
-		offset = "OffsetTime"
-		tag, err = t.ex.Get("DateTime")
-		if err != nil {
-			return dt, err
+	tag := t.exif(0x9003)
+	var offset uint16 = 0x9011
+	if tag == "" {
+		tag = t.exif(0x0132)
+		offset = 0x9010
+		if tag == "" {
+			return dt, errors.New("no datetime exif tag found")
 		}
 	}
 
-	var exOffset string
-	names := []exif.FieldName{offset}
-	for _, n := range names {
-		o, err := t.ex.Get(n)
-		if err != nil {
-			continue
-		}
-		v, err := o.StringVal()
-		if err != nil {
-			continue
-		}
-		v = strings.TrimRight(v, "\x00")
-		if v == "" || v[len(v)-1] == ':' {
-			continue
-		}
-		exOffset = v
-		break
+	exOffset := t.exif(offset)
+	if exOffset != "" && exOffset[len(exOffset)-1] != ':' {
+		return time.Parse("2006:01:02 15:04:05 -07:00", tag+" "+exOffset)
 	}
 
-	s, err := tag.StringVal()
-	if err != nil {
-		return dt, err
-	}
-
-	if exOffset != "" {
-		return time.Parse("2006:01:02 15:04:05 -07:00", s+" "+exOffset)
-	}
-
-	return time.ParseInLocation(
-		"2006:01:02 15:04:05",
-		strings.TrimRight(s, "\x00"),
-		time.Local,
-	)
+	return time.ParseInLocation("2006:01:02 15:04:05", tag, time.Local)
 }
 
 func Parse(path string) *Tags {
@@ -307,14 +242,125 @@ func Parse(path string) *Tags {
 	}
 }
 
-func ParseExif(path string) (*exif.Exif, error) {
+func ParseExif(path string) (map[uint16]exif.ExifTag, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
-	return exif.Decode(f)
+	raw, err := exif.SearchAndExtractExifWithReader(f)
+	if err != nil {
+		return nil, err
+	}
+	tags, _, err := exif.GetFlatExifData(raw, nil)
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[uint16]exif.ExifTag, len(tags))
+	for _, tag := range tags {
+		m[tag.TagId] = tag
+	}
+
+	return m, nil
+}
+
+func EditJPEGExif(file string, out io.Writer, cbs ...func(*exif.IfdBuilder) (bool, error)) error {
+	parser := jpegstructure.NewJpegMediaParser()
+	d, err := parser.ParseFile(file)
+	if err != nil {
+		return err
+	}
+	rd := d.(*jpegstructure.SegmentList)
+	builder, err := rd.ConstructExifBuilder()
+	if err != nil {
+		return err
+	}
+
+	set := false
+	for _, cb := range cbs {
+		ok, err := cb(builder)
+		set = set || ok
+		if err != nil {
+			return err
+		}
+	}
+
+	if !set {
+		f, err := os.Open(file)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = io.Copy(out, f)
+		return err
+	}
+
+	if err := rd.SetExif(builder); err != nil {
+		return err
+	}
+
+	return rd.Write(out)
+}
+
+func JPEGExifTZ(ts time.Time, force bool) func(*exif.IfdBuilder) (bool, error) {
+	set := false
+	v := func(b *exif.IfdBuilder, dt, offset uint16) error {
+		exifBuilder, err := b.ChildWithTagId(0x8769)
+		if err != nil {
+			return err
+		}
+
+		if !force {
+			if t, _ := exifBuilder.FindTag(offset); t != nil {
+				return nil
+			}
+		}
+
+		t, _ := b.FindTag(dt)
+		if t == nil {
+			t, _ = exifBuilder.FindTag(dt)
+		}
+		if t == nil {
+			return nil
+		}
+		tm, err := time.Parse("2006:01:02 15:04:05", string(bytes.Trim(t.Value().Bytes(), "\x00")))
+		if err != nil {
+			return err
+		}
+
+		s := tm.Sub(ts)
+		if s > time.Hour*24 || s < -time.Hour*24 {
+			return errors.New("impossible timezone correction")
+		}
+
+		min := s.Minutes()
+		sgn := "+"
+		if min < 0 {
+			sgn = "-"
+			min = -min
+		}
+		h := int(min / 60)
+		m := int(min - float64(h*60))
+		str := fmt.Sprintf("%s%02d:%02d\x00", sgn, h, m)
+		value := exif.NewIfdBuilderTagValueFromBytes([]byte(str))
+
+		set = true
+		return exifBuilder.Set(
+			exif.NewBuilderTag("IFD/Exif", offset, exifcommon.TypeAscii, value, binary.BigEndian),
+		)
+	}
+
+	return func(b *exif.IfdBuilder) (bool, error) {
+		if err := v(b, 0x0132, 0x9010); err != nil {
+			return set, err
+		}
+		if err := v(b, 0x9003, 0x9011); err != nil {
+			return set, err
+		}
+
+		return set, nil
+	}
 }
 
 type FFProbeInfo struct {

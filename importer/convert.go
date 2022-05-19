@@ -8,12 +8,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/frizinak/photos/meta"
 	"github.com/frizinak/photos/pp3"
+	"github.com/frizinak/photos/tags"
 )
 
-func (i *Importer) convert(input, output string, pp *pp3.PP3) error {
+func (i *Importer) convert(input, output string, pp *pp3.PP3, created time.Time) error {
 	pp3TempPath := fmt.Sprintf("%s.tmp.pp3", output)
 	err := pp.SaveTo(pp3TempPath)
 	defer os.Remove(pp3TempPath)
@@ -44,11 +46,32 @@ func (i *Importer) convert(input, output string, pp *pp3.PP3) error {
 		return fmt.Errorf("%s: %s", err, buf)
 	}
 
+	if err := i.FixJPEGTZ(tmp, created); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+
 	if tmp != output {
 		return os.Rename(tmp, output)
 	}
 
 	return nil
+}
+
+func (i *Importer) FixJPEGTZ(file string, t time.Time) error {
+	if t == (time.Time{}) {
+		return nil
+	}
+
+	tmp := file + ".tmp.fixup"
+	out, _ := os.Create(tmp)
+	err := tags.EditJPEGExif(file, out, tags.JPEGExifTZ(t, false))
+	out.Close()
+	if err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return os.Rename(tmp, file)
 }
 
 func (i *Importer) convertIfUpdated(
@@ -58,6 +81,7 @@ func (i *Importer) convertIfUpdated(
 	pp *pp3.PP3,
 	converted map[string]meta.Converted,
 	size int,
+	created time.Time,
 	checkOnly bool,
 ) (bool, string, error) {
 	pp.ResizeLongest(size)
@@ -85,7 +109,7 @@ func (i *Importer) convertIfUpdated(
 		return true, rel, nil
 	}
 	os.MkdirAll(filepath.Dir(output), 0755)
-	return true, rel, i.convert(link, output, pp)
+	return true, rel, i.convert(link, output, pp, created)
 }
 
 func (i *Importer) Unedited(f *File) (bool, error) {
@@ -177,6 +201,7 @@ func (i *Importer) fileConvert(f *File, sizes []int, checkOnly bool) (bool, erro
 				pp3s[n],
 				conv,
 				s,
+				m.CreatedTime(),
 				checkOnly,
 			)
 			changed = changed || conv

@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/frizinak/photos/imagemagick"
 	"github.com/frizinak/photos/pp3"
@@ -64,7 +65,7 @@ func (i *Importer) MakePreview(f *File) error {
 		return err
 	}
 	pp.ResizeLongest(1920)
-	if err := i.convert(f.Path(), tmp, pp); err != nil {
+	if err := i.convert(f.Path(), tmp, pp, time.Time{}); err != nil {
 		return err
 	}
 
