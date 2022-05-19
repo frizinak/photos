@@ -69,23 +69,21 @@ func Register(name string, backend Backend) {
 }
 
 type Importer struct {
-	log      *log.Logger
-	verbose  *log.Logger
-	tzOffset int
-	rawDir   string
-	colDir   string
-	convDir  string
+	log     *log.Logger
+	verbose *log.Logger
+	rawDir  string
+	colDir  string
+	convDir string
 
 	symlinkSem   sync.RWMutex
 	symlinkCache map[string][]LinkInfo
 }
 
-func New(log, verbose *log.Logger, tzOffset int, rawDir, colDir, convDir string) *Importer {
+func New(log, verbose *log.Logger, rawDir, colDir, convDir string) *Importer {
 	i := &Importer{
-		log:      log,
-		tzOffset: tzOffset,
-		verbose:  verbose,
-		rawDir:   rawDir, colDir: colDir, convDir: convDir,
+		log:     log,
+		verbose: verbose,
+		rawDir:  rawDir, colDir: colDir, convDir: convDir,
 	}
 	i.ClearCache()
 	return i
@@ -222,7 +220,7 @@ func (i *Importer) Import(checksum bool, progress Progress) error {
 			return err
 		}
 
-		_, err = MakeMeta(p, i.tzOffset)
+		_, err = MakeMeta(p)
 		return err
 	}
 

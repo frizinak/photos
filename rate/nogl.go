@@ -14,7 +14,7 @@ type Rater struct{}
 
 var err = errors.New("rater can't be launched as no GL backend available")
 
-func New(log *log.Logger, tzOffset int, files []*importer.File, imp *importer.Importer) (*Rater, error) {
+func New(log *log.Logger, files []*importer.File, imp *importer.Importer) (*Rater, error) {
 	return nil, err
 }
 

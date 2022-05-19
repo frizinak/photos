@@ -234,9 +234,9 @@ func (t *Tags) CameraInfo() (CameraInfo, bool) {
 	return c, true
 }
 
-func (t *Tags) Date(tzOffsetMinutes int) time.Time {
+func (t *Tags) Date() time.Time {
 	if t.ex != nil {
-		d, err := t.exifDate(tzOffsetMinutes)
+		d, err := t.exifDate()
 		if err != nil {
 			panic(err)
 		}
@@ -248,10 +248,12 @@ func (t *Tags) Date(tzOffsetMinutes int) time.Time {
 	return time.Time{}
 }
 
-func (t *Tags) exifDate(tzOffset int) (time.Time, error) {
+func (t *Tags) exifDate() (time.Time, error) {
 	var dt time.Time
 	tag, err := t.ex.Get("DateTimeOriginal")
+	var offset exif.FieldName = "OffsetTimeOriginal"
 	if err != nil {
+		offset = "OffsetTime"
 		tag, err = t.ex.Get("DateTime")
 		if err != nil {
 			return dt, err
@@ -259,7 +261,7 @@ func (t *Tags) exifDate(tzOffset int) (time.Time, error) {
 	}
 
 	var exOffset string
-	names := []exif.FieldName{exifOffsetTime, exifOffsetTimeFB1, exifOffsetTimeFB2}
+	names := []exif.FieldName{offset}
 	for _, n := range names {
 		o, err := t.ex.Get(n)
 		if err != nil {
@@ -270,7 +272,7 @@ func (t *Tags) exifDate(tzOffset int) (time.Time, error) {
 			continue
 		}
 		v = strings.TrimRight(v, "\x00")
-		if v == "" {
+		if v == "" || v[len(v)-1] == ':' {
 			continue
 		}
 		exOffset = v
@@ -286,15 +288,11 @@ func (t *Tags) exifDate(tzOffset int) (time.Time, error) {
 		return time.Parse("2006:01:02 15:04:05 -07:00", s+" "+exOffset)
 	}
 
-	dt, err = time.ParseInLocation(
+	return time.ParseInLocation(
 		"2006:01:02 15:04:05",
 		strings.TrimRight(s, "\x00"),
-		time.FixedZone("Fixed", int((time.Minute*time.Duration(tzOffset)).Seconds())),
+		time.Local,
 	)
-	if err != nil {
-		return dt, err
-	}
-	return dt.Local(), nil
 }
 
 func Parse(path string) *Tags {

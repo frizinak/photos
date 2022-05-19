@@ -11,7 +11,7 @@ func metaFile(f *File) string {
 	return f.Path() + ".meta"
 }
 
-func MakeMeta(f *File, tzOffsetMinutes int) (meta.Meta, error) {
+func MakeMeta(f *File) (meta.Meta, error) {
 	m, err := GetMeta(f)
 	if err != nil && !os.IsNotExist(err) {
 		return m, err
@@ -29,7 +29,7 @@ func MakeMeta(f *File, tzOffsetMinutes int) (meta.Meta, error) {
 	if err = tags.Err(); err != nil {
 		return m, err
 	}
-	date := tags.Date(tzOffsetMinutes)
+	date := tags.Date()
 	m.Created = date.Unix()
 
 	if ci, ok := tags.CameraInfo(); ok {
@@ -47,11 +47,11 @@ func SaveMeta(f *File, m meta.Meta) error {
 	return m.Save(metaFile(f))
 }
 
-func EnsureMeta(f *File, tzOffsetMinutes int) (meta.Meta, error) {
+func EnsureMeta(f *File) (meta.Meta, error) {
 	m, err := GetMeta(f)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return MakeMeta(f, tzOffsetMinutes)
+			return MakeMeta(f)
 		}
 	}
 	return m, err

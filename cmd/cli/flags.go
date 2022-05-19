@@ -209,14 +209,6 @@ special case: '*' only matches files with tags`,
 		},
 	},
 
-	flags.CameraFixedTZ: {
-		help: `[import,rewrite-meta] timezone offset in minutes.
-Since there is no standard in exif timezone data the time we store in .meta will be off unless your camera is set to UTC.
-Set this to the timezone your camera is ALWAYS in, won't work if your camera has correcly applied daylight saving times (set either automatically or manually).
-e.g.: daylight saving time always off in brussels: -tz 120
-e.g.: daylight saving time always on             : -tz 60`,
-	},
-
 	flags.RawDir:        {help: "[any] Raw directory"},
 	flags.CollectionDir: {help: "[any] Collection directory"},
 	flags.JPEGDir:       {help: "[convert] JPEG directory"},
@@ -259,8 +251,6 @@ type Flags struct {
 	time struct {
 		since, until *time.Time
 	}
-
-	tz *int
 
 	rawDir, collectionDir, jpegDir string
 
@@ -336,15 +326,6 @@ func (f *Flags) GPhotosCredentials() string { return f.gphotos }
 func (f *Flags) GLocationDirectory() string { return f.glocation }
 
 func (f *Flags) Log() *log.Logger { return f.log }
-
-func (f *Flags) TZOffset() (offset int, ok bool) {
-	if f.tz == nil {
-		return
-	}
-	ok = true
-	offset = *f.tz
-	return
-}
 
 func (f *Flags) makeFilters(imp *importer.Importer) {
 	if f.mfilterFuncs != nil {
@@ -681,7 +662,6 @@ func (f *Flags) Parse() {
 	var gphotos string
 	var glocation string
 	var since, until string
-	var tz int
 	var help bool
 	var verbose bool
 
@@ -710,8 +690,6 @@ func (f *Flags) Parse() {
 	f.fs.StringVar(&gphotos, flags.GPhotosCredentials, "", f.lists.Help(flags.GPhotosCredentials))
 	f.fs.StringVar(&glocation, flags.GLocationDirectory, "", f.lists.Help(flags.GLocationDirectory))
 
-	f.fs.IntVar(&tz, flags.CameraFixedTZ, 0, f.lists.Help(flags.CameraFixedTZ))
-
 	f.fs.IntVar(&maxWorkers, flags.MaxWorkers, 100, f.lists.Help(flags.MaxWorkers))
 
 	f.fs.StringVar(&baseDir, flags.BaseDir, "", f.lists.Help(flags.BaseDir))
@@ -730,13 +708,6 @@ func (f *Flags) Parse() {
 		f.fs.PrintDefaults()
 		os.Exit(0)
 	}
-
-	tzSet := false
-	f.fs.Visit(func(f *flag.Flag) {
-		if f.Name == flags.CameraFixedTZ {
-			tzSet = true
-		}
-	})
 
 	f.actions = flags.CommaSep(strings.Join(actions, ","))
 	if len(f.actions) == 0 {
@@ -847,10 +818,6 @@ func (f *Flags) Parse() {
 	f.gphotos = gphotos
 	f.glocation = glocation
 	f.verbose = verbose
-	f.tz = &tz
-	if !tzSet {
-		f.tz = nil
-	}
 
 	f.log = log.New(os.Stderr, "", log.LstdFlags)
 	if !verbose {

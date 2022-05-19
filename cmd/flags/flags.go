@@ -43,7 +43,6 @@ const (
 	GPhotosCredentials = "gphotos"
 	GLocationDirectory = "glocation"
 	Verbose            = "v"
-	CameraFixedTZ      = "tz"
 )
 
 const (
@@ -106,7 +105,6 @@ var (
 		GPhotosCredentials: struct{}{},
 		GLocationDirectory: struct{}{},
 		Verbose:            struct{}{},
-		CameraFixedTZ:      struct{}{},
 	}
 
 	AllActions = map[string]struct{}{

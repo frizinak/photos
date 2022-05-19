@@ -75,8 +75,7 @@ func main() {
 	l := log.New(os.Stderr, "", log.LstdFlags)
 	flag := cli.NewFlags()
 	flag.Parse()
-	tzOffset, tzOffsetOK := flag.TZOffset()
-	imp := importer.New(l, flag.Log(), tzOffset, flag.RawDir(), flag.CollectionDir(), flag.JPEGDir())
+	imp := importer.New(l, flag.Log(), flag.RawDir(), flag.CollectionDir(), flag.JPEGDir())
 
 	var filter func(f *importer.File) bool
 	all := func(it func(f *importer.File) (bool, error)) {
@@ -88,12 +87,6 @@ func main() {
 				return it(f)
 			}),
 		)
-	}
-
-	tzExit := func() {
-		if !tzOffsetOK {
-			flag.Exit(errors.New("no timezone offset set"))
-		}
 	}
 
 	const pbarSize = 17
@@ -245,7 +238,6 @@ func main() {
 
 	cmds := map[string]func(){
 		flags.ActionImport: func() {
-			tzExit()
 			l.Println("importing")
 			for _, path := range flag.SourceDirs() {
 				importer.Register(
@@ -443,7 +435,7 @@ func main() {
 				return
 			}
 
-			rater, err := rate.New(l, tzOffset, list, imp)
+			rater, err := rate.New(l, list, imp)
 			flag.Exit(err)
 			flag.Exit(rater.Run())
 		},
@@ -454,11 +446,10 @@ func main() {
 			})
 		},
 		flags.ActionRewriteMeta: func() {
-			tzExit()
 			l.Println("rewriting meta")
 			work(-1, func(f *importer.File) (workCB, error) {
 				return func() error {
-					_, err := importer.MakeMeta(f, tzOffset)
+					_, err := importer.MakeMeta(f)
 					return err
 				}, nil
 			})
