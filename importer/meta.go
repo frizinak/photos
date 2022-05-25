@@ -25,8 +25,13 @@ func MakeMeta(f *File) (meta.Meta, error) {
 		}
 	}
 
-	tags := tags.Parse(f.Path())
-	if err = tags.Err(); err != nil {
+	p := tags.ParseExif
+	if f.TypeVideo() {
+		p = tags.ParseFFProbe
+	}
+	tags, err := p(f.Path())
+
+	if err != nil {
 		return m, err
 	}
 	date := tags.Date()

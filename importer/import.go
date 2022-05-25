@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"sync"
 )
 
@@ -36,26 +35,9 @@ type Backend interface {
 }
 
 var (
-	lock             sync.Mutex
-	backends         = map[string]Backend{}
-	alphaRE          = regexp.MustCompile(`[^A-Za-z0-9.\-_]+`)
-	supportedExtList = map[string]struct{}{
-		".raf":  struct{}{},
-		".nef":  struct{}{},
-		".jpg":  struct{}{},
-		".dng":  struct{}{},
-		".tiff": struct{}{},
-		".tif":  struct{}{},
-		".mov":  struct{}{},
-	}
-	pp3ExtList = map[string]struct{}{
-		".raf":  struct{}{},
-		".nef":  struct{}{},
-		".jpg":  struct{}{},
-		".dng":  struct{}{},
-		".tiff": struct{}{},
-		".tif":  struct{}{},
-	}
+	lock     sync.Mutex
+	backends = map[string]Backend{}
+	alphaRE  = regexp.MustCompile(`[^A-Za-z0-9.\-_]+`)
 )
 
 func clean(str string) string {
@@ -95,29 +77,15 @@ func (i *Importer) ClearCache() {
 	i.symlinkSem.Unlock()
 }
 
-func (i *Importer) IsImage(file string) bool {
-	return i.supportedPP3(file)
-}
-
 func (i *Importer) supported(file string) bool {
-	ext := strings.ToLower(filepath.Ext(file))
-	_, ok := supportedExtList[ext]
-	return ok
+	return FileTypeRAW(file) || FileTypeImage(file) || FileTypeVideo(file)
 }
 
 func (i *Importer) supportedPP3(file string) bool {
-	ext := strings.ToLower(filepath.Ext(file))
-	_, ok := pp3ExtList[ext]
-	return ok
+	return FileTypeRAW(file) || FileTypeImage(file)
 }
 
-func (i *Importer) SupportedExtList() []string {
-	l := make([]string, 0, len(supportedExtList))
-	for i := range supportedExtList {
-		l = append(l, i)
-	}
-	return l
-}
+func (i *Importer) SupportedExtList() []string { return SupportedFileExtList() }
 
 func (i *Importer) Import(checksum bool, progress Progress) error {
 	os.MkdirAll(i.rawDir, 0755)

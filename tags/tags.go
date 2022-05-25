@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -116,12 +116,9 @@ func (c CameraInfo) String() string {
 }
 
 type Tags struct {
-	ex  map[uint16]exif.ExifTag
-	ff  *FFProbeInfo
-	err error
+	ex map[uint16]exif.ExifTag
+	ff *FFProbeInfo
 }
-
-func (t *Tags) Err() error { return t.err }
 
 var fre = regexp.MustCompile(`^\[?([0-9]+)/([0-9]+)\]?$`)
 
@@ -196,6 +193,23 @@ func (t *Tags) CameraInfo() (CameraInfo, bool) {
 	return c, true
 }
 
+func (t *Tags) Bounds() image.Rectangle {
+	if t.ff != nil {
+		return t.ff.Bounds()
+	}
+
+	return image.Rectangle{}
+}
+
+func (t *Tags) Duration() time.Duration {
+	if t.ff != nil {
+		return t.ff.Duration()
+	}
+
+	// perhaps return shutterspeed ;)
+	return 0
+}
+
 func (t *Tags) Date() time.Time {
 	if t.ex != nil {
 		d, err := t.exifDate()
@@ -230,19 +244,7 @@ func (t *Tags) exifDate() (time.Time, error) {
 	return time.ParseInLocation("2006:01:02 15:04:05", tag, time.Local)
 }
 
-func Parse(path string) *Tags {
-	ext := strings.ToLower(filepath.Ext(path))
-	switch ext {
-	case ".nef", ".raf", ".dng", ".tiff", ".tif", ".jpg":
-		ex, err := ParseExif(path)
-		return &Tags{ex: ex, err: err}
-	default:
-		ff, err := ParseFFProbe(path)
-		return &Tags{ff: ff, err: err}
-	}
-}
-
-func ParseExif(path string) (map[uint16]exif.ExifTag, error) {
+func ParseExif(path string) (*Tags, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -262,7 +264,7 @@ func ParseExif(path string) (map[uint16]exif.ExifTag, error) {
 		m[tag.TagId] = tag
 	}
 
-	return m, nil
+	return &Tags{ex: m}, nil
 }
 
 func EditJPEGExif(file string, out io.Writer, cbs ...func(*exif.IfdBuilder) (bool, error)) error {
@@ -364,8 +366,13 @@ func JPEGExifTZ(ts time.Time, force bool) func(*exif.IfdBuilder) (bool, error) {
 }
 
 type FFProbeInfo struct {
+	Streams []struct {
+		Width  int `json:"width"`
+		Height int `json:"height"`
+	} `json:"streams"`
 	Format struct {
-		Tags struct {
+		Duration string `json:"duration"`
+		Tags     struct {
 			CreationTime time.Time `json:"creation_time"`
 		} `json:"tags"`
 	} `json:"format"`
@@ -375,7 +382,29 @@ func (ff *FFProbeInfo) Date() time.Time {
 	return ff.Format.Tags.CreationTime
 }
 
-func ParseFFProbe(path string) (*FFProbeInfo, error) {
+func (ff *FFProbeInfo) Duration() time.Duration {
+	f, err := strconv.ParseFloat(ff.Format.Duration, 64)
+	if err != nil {
+		return 0
+	}
+	return time.Duration(f*1e6) * 1e3
+}
+
+func (ff *FFProbeInfo) Bounds() image.Rectangle {
+	var w, h int
+	for _, s := range ff.Streams {
+		if s.Width > w {
+			w = s.Width
+		}
+		if s.Height > h {
+			h = s.Height
+		}
+	}
+
+	return image.Rect(0, 0, w, h)
+}
+
+func ParseFFProbe(path string) (*Tags, error) {
 	cmd := exec.Command(
 		"ffprobe",
 		"-v",
@@ -384,7 +413,7 @@ func ParseFFProbe(path string) (*FFProbeInfo, error) {
 		"-print_format",
 		"json",
 		"-show_entries",
-		"format_tags=creation_time",
+		"format=duration:format_tags=creation_time:stream=width,height",
 	)
 
 	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
@@ -395,5 +424,5 @@ func ParseFFProbe(path string) (*FFProbeInfo, error) {
 	}
 
 	dec := json.NewDecoder(stdout)
-	return ff, dec.Decode(ff)
+	return &Tags{ff: ff}, dec.Decode(ff)
 }

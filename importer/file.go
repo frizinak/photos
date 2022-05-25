@@ -7,6 +7,68 @@ import (
 	"strings"
 )
 
+var (
+	rawexts = map[string]struct{}{
+		".raf":  {},
+		".nef":  {},
+		".dng":  {},
+		".tiff": {},
+		".tif":  {},
+		".3fr":  {},
+		".ari":  {},
+		".arw":  {},
+		".srf":  {},
+		".sr2":  {},
+		".bay":  {},
+		".braw": {},
+		".cri":  {},
+		".crw":  {},
+		".cr2":  {},
+		".cr3":  {},
+		".cap":  {},
+		".iiq":  {},
+		".eip":  {},
+		".dcs":  {},
+		".dcr":  {},
+		".drf":  {},
+		".k25":  {},
+		".kdc":  {},
+		".erf":  {},
+		".fff":  {},
+		".gpr":  {},
+		".jxs":  {},
+		".mef":  {},
+		".mdc":  {},
+		".mos":  {},
+		".mrw":  {},
+		".nrw":  {},
+		".orf":  {},
+		".pef":  {},
+		".ptx":  {},
+		".pxn":  {},
+		".r3d":  {},
+		".raw":  {},
+		".rw2":  {},
+		".rwl":  {},
+		".rwz":  {},
+		".srw":  {},
+		".tco":  {},
+		".x3f":  {},
+	}
+	imageexts = map[string]struct{}{
+		".jpg":  {},
+		".jpeg": {},
+		".png":  {},
+	}
+	videoexts = map[string]struct{}{
+		".mov":  {},
+		".mp4":  {},
+		".mkv":  {},
+		".webm": {},
+		".avi":  {},
+	}
+)
+
 type File struct {
 	dir   string
 	bytes int64
@@ -58,8 +120,44 @@ func (f *File) Filename() string {
 
 func (f *File) Bytes() int64 { return f.bytes }
 
+func (f *File) TypeRAW() bool   { return FileTypeRAW(f.fn) }
+func (f *File) TypeImage() bool { return FileTypeImage(f.fn) }
+func (f *File) TypeVideo() bool { return FileTypeVideo(f.fn) }
+
 type Files []*File
 
 func (f Files) Len() int           { return len(f) }
 func (f Files) Swap(i, j int)      { f[i], f[j] = f[j], f[i] }
 func (f Files) Less(i, j int) bool { return f[i].BaseFilename() < f[j].BaseFilename() }
+
+func ext(s string) string {
+	return strings.ToLower(filepath.Ext(s))
+}
+
+func FileTypeRAW(file string) bool {
+	_, ok := rawexts[ext(file)]
+	return ok
+}
+func FileTypeImage(file string) bool {
+	_, ok := imageexts[ext(file)]
+	return ok
+}
+func FileTypeVideo(file string) bool {
+	_, ok := videoexts[ext(file)]
+	return ok
+}
+
+func SupportedFileExtList() []string {
+	l := make([]string, 0, len(rawexts)+len(imageexts)+len(videoexts))
+	for v := range rawexts {
+		l = append(l, v)
+	}
+	for v := range imageexts {
+		l = append(l, v)
+	}
+	for v := range videoexts {
+		l = append(l, v)
+	}
+
+	return l
+}

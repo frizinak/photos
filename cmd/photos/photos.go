@@ -416,14 +416,7 @@ func main() {
 			})
 		},
 		flags.ActionRate: func() {
-			flist := allMeta()
-			_list := make(FileMetas, 0, len(flist))
-			for _, f := range flist {
-				if !imp.IsImage(f.f.Filename()) {
-					continue
-				}
-				_list = append(_list, f)
-			}
+			_list := allMeta()
 			sort.Sort(_list)
 			list := make(importer.Files, len(_list))
 			for i := range _list {
