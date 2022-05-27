@@ -116,68 +116,98 @@ func (vid *vidPreviewGen) Make(i *Importer, f *File, output string) error {
 	if err != nil {
 		return err
 	}
-	const horiz = 4
-	const vert = 4
+	horiz := 3
+	vert := 3
 	const xres = 2560
+	const pad = 64
 
-	dur := p.Duration()
-	n := dur / 20
-	iv := (dur - 2*n) / (horiz * vert)
 	b := p.Bounds()
 	aspect := float64(b.Dy()) / float64(b.Dx())
+	if aspect > 1.77 {
+		horiz = int(aspect * float64(vert) * 1.77)
+	}
+	if aspect < 1.77 {
+		vert = int(float64(horiz) / aspect / 1.77)
+	}
+
+	if horiz > 8 {
+		horiz = 8
+	}
+	if vert > 8 {
+		vert = 8
+	}
+
+	dur := p.Duration()
+	timePad := dur / 20
+	n := timePad
+	iv := (dur - 2*timePad) / time.Duration(horiz*vert)
 	w := xres / horiz
 	h := int(float64(w) * aspect)
-	canvas := image.NewNRGBA(image.Rect(0, 0, xres, h*horiz))
-	xpad := w / 64
-	ypad := h / int(aspect*64)
+	canvas := image.NewNRGBA(image.Rect(0, 0, xres, h*vert))
+	xpad := w / pad
+	ypad := h / int(aspect*pad)
 	w -= xpad
 	h -= ypad
 
 	iteration := 0
 	rect := image.Rect(xpad/2, ypad/2, w+xpad/2, h+ypad/2)
+	errs := make(chan error)
+	var m sync.Mutex
+	rl := make(chan struct{}, 4)
 	for {
-		if n >= dur {
+		if n >= dur-timePad {
 			break
 		}
-		reader, writer := io.Pipe()
-		cmd := exec.Command("ffmpeg",
-			"-loglevel", "error",
-			"-hide_banner",
-			"-ss", fmt.Sprintf("%.3f", n.Seconds()),
-			"-i", f.Path(),
-			"-frames:v", "1",
-			"-s", fmt.Sprintf("%dx%d", w, h),
-			"-c:v", "bmp",
-			"-f", "rawvideo",
-			"-",
-		)
-		n += iv
 
-		type res struct {
-			image.Image
-			err error
-		}
-		d := make(chan res, 1)
-		go func() {
-			img, err := bmp.Decode(reader)
-			d <- res{img, err}
-		}()
+		go func(n time.Duration, rect image.Rectangle) {
+			rl <- struct{}{}
+			defer func() { <-rl }()
+			reader, writer := io.Pipe()
+			cmd := exec.Command("ffmpeg",
+				"-loglevel", "error",
+				"-hide_banner",
+				"-ss", fmt.Sprintf("%.3f", n.Seconds()),
+				"-i", f.Path(),
+				"-frames:v", "1",
+				"-s", fmt.Sprintf("%dx%d", w, h),
+				"-c:v", "bmp",
+				"-f", "rawvideo",
+				"-",
+			)
+			//n += iv
 
-		buf := bytes.NewBuffer(nil)
-		cmd.Stdout = writer
-		cmd.Stderr = os.Stderr
-		err = cmd.Run()
-		if err != nil {
-			writer.Close()
-			return fmt.Errorf("%w: %s", err, buf.String())
-		}
+			type res struct {
+				image.Image
+				err error
+			}
+			d := make(chan res, 1)
+			go func() {
+				img, err := bmp.Decode(reader)
+				d <- res{img, err}
+			}()
 
-		o := <-d
-		if o.err != nil {
-			return o.err
-		}
+			buf := bytes.NewBuffer(nil)
+			cmd.Stdout = writer
+			cmd.Stderr = buf
+			err = cmd.Run()
+			if err != nil {
+				writer.Close()
+				errs <- fmt.Errorf("%w: %s", err, buf.String())
+				return
+			}
 
-		draw.Draw(canvas, rect, o.Image, image.Point{}, draw.Over)
+			o := <-d
+			if o.err != nil {
+				errs <- o.err
+				return
+			}
+
+			m.Lock()
+			draw.Draw(canvas, rect, o.Image, image.Point{}, draw.Over)
+			m.Unlock()
+			errs <- nil
+		}(n, rect)
+
 		rect.Min.X += xpad + w
 		rect.Max.X += xpad + w
 		iteration++
@@ -186,6 +216,18 @@ func (vid *vidPreviewGen) Make(i *Importer, f *File, output string) error {
 			rect.Min.Y += ypad + h
 			rect.Max.Y += ypad + h
 		}
+		n += iv
+	}
+
+	var gerr error
+	for i := 0; i < iteration; i++ {
+		err := <-errs
+		if gerr == nil && err != nil {
+			gerr = err
+		}
+	}
+	if gerr != nil {
+		return gerr
 	}
 
 	tmp := output + ".tmp"

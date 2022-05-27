@@ -367,8 +367,11 @@ func JPEGExifTZ(ts time.Time, force bool) func(*exif.IfdBuilder) (bool, error) {
 
 type FFProbeInfo struct {
 	Streams []struct {
-		Width  int `json:"width"`
-		Height int `json:"height"`
+		Width        int `json:"width"`
+		Height       int `json:"height"`
+		SideDataList []struct {
+			Rotation int `json:"rotation"`
+		} `json:"side_data_list"`
 	} `json:"streams"`
 	Format struct {
 		Duration string `json:"duration"`
@@ -393,6 +396,12 @@ func (ff *FFProbeInfo) Duration() time.Duration {
 func (ff *FFProbeInfo) Bounds() image.Rectangle {
 	var w, h int
 	for _, s := range ff.Streams {
+		for _, sd := range s.SideDataList {
+			if sd.Rotation == 90 || sd.Rotation == 270 {
+				s.Width, s.Height = s.Height, s.Width
+				break
+			}
+		}
 		if s.Width > w {
 			w = s.Width
 		}
@@ -413,7 +422,7 @@ func ParseFFProbe(path string) (*Tags, error) {
 		"-print_format",
 		"json",
 		"-show_entries",
-		"format=duration:format_tags=creation_time:stream=width,height",
+		"format=duration:format_tags=creation_time:stream", //width,height",
 	)
 
 	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
