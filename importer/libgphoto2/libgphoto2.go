@@ -4,21 +4,25 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
+	"strings"
 
 	gp2 "github.com/frizinak/gphoto2go"
 	"github.com/frizinak/photos/importer"
 )
 
-func init() {
-	importer.Register("libgphoto2", New())
-}
-
 type LibGPhoto2 struct {
-	cam *gp2.Camera
+	cam  *gp2.Camera
+	exts map[string]struct{}
 }
 
-func New() *LibGPhoto2 {
-	return &LibGPhoto2{}
+func New(exts []string) *LibGPhoto2 {
+	m := map[string]struct{}{}
+	for _, e := range exts {
+		e = strings.ToLower(e)
+		m[e] = struct{}{}
+	}
+	return &LibGPhoto2{exts: m}
 }
 
 func (l *LibGPhoto2) init() error {
@@ -87,6 +91,11 @@ func (l *LibGPhoto2) Import(
 		}
 
 		for _, name := range names {
+			ext := filepath.Ext(name)
+			if _, ok := l.exts[strings.ToLower(ext)]; !ok {
+				continue
+			}
+
 			total++
 			i, err := l.cam.Info(dir, name)
 			if err != nil {

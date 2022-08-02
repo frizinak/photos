@@ -85,7 +85,9 @@ func (i *Importer) supportedPP3(file string) bool {
 	return FileTypeRAW(file) || FileTypeImage(file)
 }
 
-func (i *Importer) SupportedExtList() []string { return SupportedFileExtList() }
+func (i *Importer) ImageExtList(n []string) []string { return ImageExtList(n) }
+func (i *Importer) VideoExtList(n []string) []string { return VideoExtList(n) }
+func (i *Importer) RawExtList(n []string) []string   { return RawExtList(n) }
 
 func (i *Importer) Import(checksum bool, progress Progress) error {
 	os.MkdirAll(i.rawDir, 0755)

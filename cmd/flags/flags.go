@@ -30,6 +30,7 @@ const (
 	Until              = "until"
 	Tags               = "tag"
 	Checksum           = "sum"
+	ImportJPEG         = "import-jpegs"
 	Sizes              = "sizes"
 	RawDir             = "raws"
 	CollectionDir      = "collection"

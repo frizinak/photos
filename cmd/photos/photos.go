@@ -26,6 +26,8 @@ import (
 	"github.com/frizinak/photos/gtimeline"
 	"github.com/frizinak/photos/importer"
 	"github.com/frizinak/photos/importer/fs"
+	"github.com/frizinak/photos/importer/gphoto2"
+	"github.com/frizinak/photos/importer/libgphoto2"
 	"github.com/frizinak/photos/meta"
 	"github.com/frizinak/photos/rate"
 )
@@ -239,12 +241,28 @@ func main() {
 	cmds := map[string]func(){
 		flags.ActionImport: func() {
 			l.Println("importing")
+			exts := make([]string, 0)
+			exts = imp.RawExtList(exts)
+			exts = imp.VideoExtList(exts)
+			n := "raw"
+			if flag.ImportJPEG() {
+				n = "all"
+				exts = imp.ImageExtList(exts)
+			}
 			for _, path := range flag.SourceDirs() {
 				importer.Register(
-					"filesystem:"+path,
-					fs.New(path, true, imp.SupportedExtList()),
+					fmt.Sprintf("filesystem:%s:%s", n, path),
+					fs.New(path, true, exts),
 				)
 			}
+
+			var gp importer.Backend = libgphoto2.New(exts)
+			n = "libgphoto2"
+			if ok, _ := gp.Available(); !ok {
+				gp = gphoto2.New(exts)
+				n = "gphoto2"
+			}
+			importer.Register(n, gp)
 
 			flag.Exit(imp.Import(flag.Checksum(), progress))
 			progressDone()

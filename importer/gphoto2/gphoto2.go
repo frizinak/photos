@@ -2,10 +2,12 @@ package gphoto2
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"log"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -22,30 +24,37 @@ var (
 	sizeRE         = regexp.MustCompile(`Size:\s+(\d+) byte`)
 )
 
-func init() {
-	importer.Register(bin, New())
-}
-
 type GPhoto2 struct {
+	exts map[string]struct{}
 }
 
-func New() *GPhoto2 {
-	return &GPhoto2{}
+func New(exts []string) *GPhoto2 {
+	m := map[string]struct{}{}
+	for _, e := range exts {
+		e = strings.ToLower(e)
+		m[e] = struct{}{}
+	}
+	return &GPhoto2{exts: m}
 }
 
 type scanCloser struct {
 	*bufio.Scanner
+	err *bytes.Buffer
 	cmd *exec.Cmd
 }
 
 func (s *scanCloser) Close() error {
 	if err := s.cmd.Wait(); err != nil {
+		err = fmt.Errorf("%w: %s", err, s.err.String())
 		return err
 	}
 	return s.Err()
 }
 
 func (g *GPhoto2) cmd(cmd *exec.Cmd) (*scanCloser, error) {
+	buf := bytes.NewBuffer(nil)
+	cmd.Stderr = buf
+
 	r, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -56,7 +65,7 @@ func (g *GPhoto2) cmd(cmd *exec.Cmd) (*scanCloser, error) {
 	}
 	scanner := bufio.NewScanner(r)
 	scanner.Split(bufio.ScanLines)
-	return &scanCloser{scanner, cmd}, nil
+	return &scanCloser{scanner, buf, cmd}, nil
 }
 
 func (g *GPhoto2) Available() (bool, error) {
@@ -111,12 +120,21 @@ func (g *GPhoto2) Import(log *log.Logger, destination string, imp *importer.Impo
 			continue
 		}
 
+		if len(s) == 0 {
+			continue
+		}
+
 		if s[0] != '#' {
 			continue
 		}
 
 		fn := filenameRE.FindStringSubmatch(s)
 		if len(fn) != 3 {
+			continue
+		}
+
+		ext := filepath.Ext(fn[2])
+		if _, ok := g.exts[strings.ToLower(ext)]; !ok {
 			continue
 		}
 
@@ -195,6 +213,9 @@ func (g *GPhoto2) Import(log *log.Logger, destination string, imp *importer.Impo
 		imp.Progress(n, len(files))
 		log.Println(scanner.Text())
 	}
+	if err := scanner.Close(); err != nil {
+		return err
+	}
 
 	for _, f := range files {
 		if err := imp.Add(f.BasePath(), f); err != nil {
@@ -202,5 +223,5 @@ func (g *GPhoto2) Import(log *log.Logger, destination string, imp *importer.Impo
 		}
 	}
 
-	return scanner.Close()
+	return nil
 }

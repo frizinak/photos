@@ -147,17 +147,16 @@ func FileTypeVideo(file string) bool {
 	return ok
 }
 
-func SupportedFileExtList() []string {
-	l := make([]string, 0, len(rawexts)+len(imageexts)+len(videoexts))
-	for v := range rawexts {
-		l = append(l, v)
-	}
-	for v := range imageexts {
-		l = append(l, v)
-	}
-	for v := range videoexts {
-		l = append(l, v)
-	}
+func ImageExtList(n []string) []string { return mlist(n, imageexts) }
+func VideoExtList(n []string) []string { return mlist(n, videoexts) }
+func RawExtList(n []string) []string   { return mlist(n, rawexts) }
 
+func mlist(l []string, m map[string]struct{}) []string {
+	if l == nil {
+		l = make([]string, 0, len(m))
+	}
+	for v := range m {
+		l = append(l, v)
+	}
 	return l
 }

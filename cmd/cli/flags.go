@@ -169,7 +169,7 @@ var lists = Lists{
 
 	flags.GT:     {help: "[any] greater than given rating filter"},
 	flags.LT:     {help: "[any] less than given rating filter"},
-	flags.Camera: {help: "[any] filter camera make and model(* as wildcard, case insensitive)"},
+	flags.Camera: {help: "[any] filter camera make and model (* as wildcard, case insensitive)"},
 	flags.Lens:   {help: "[any] filter lens make and model (* as wildcard, case insensitive)"},
 	flags.Exposure: {
 		help: "[any] filter exposure settings",
@@ -197,7 +197,8 @@ special case: '-' only matches files with no tags
 special case: '*' only matches files with tags`,
 	},
 
-	flags.Checksum: {help: "[import] dry-run and report non-identical files with duplicate filenames"},
+	flags.Checksum:   {help: "[import] dry-run and report non-identical files with duplicate filenames"},
+	flags.ImportJPEG: {help: "[import] also import jpegs"},
 	flags.Sizes: {
 		help: "comma separated and/or specified multiple times (e.g.: 3840,1920,800)",
 		list: map[string][]string{
@@ -258,6 +259,8 @@ type Flags struct {
 
 	checksum bool
 
+	importJPEG bool
+
 	alwaysYes bool
 
 	verbose bool
@@ -310,6 +313,7 @@ func (f *Flags) JPEGDir() string       { return f.jpegDir }
 func (f *Flags) SourceDirs() []string { return f.sourceDirs }
 
 func (f *Flags) Checksum() bool    { return f.checksum }
+func (f *Flags) ImportJPEG() bool  { return f.importJPEG }
 func (f *Flags) Yes() bool         { return f.alwaysYes }
 func (f *Flags) NoRawPrefix() bool { return f.noRawPrefix }
 
@@ -663,9 +667,10 @@ func (f *Flags) Parse() {
 	var glocation string
 	var since, until string
 	var help bool
+	var importJPEG bool
 	var verbose bool
 
-	f.fs.BoolVar(&help, "h", false, "help")
+	f.fs.BoolVar(&help, "h", false, "\nhelp\n")
 	f.fs.Var(&actions, flags.Actions, f.lists.Help(flags.Actions))
 	f.fs.Var(&filters, flags.Filters, f.lists.Help(flags.Filters))
 	f.fs.IntVar(&ratingGTFilter, flags.GT, -1, f.lists.Help(flags.GT))
@@ -681,6 +686,7 @@ func (f *Flags) Parse() {
 	f.fs.Var(&tags, flags.Tags, f.lists.Help(flags.Tags))
 
 	f.fs.BoolVar(&checksum, flags.Checksum, false, f.lists.Help(flags.Checksum))
+	f.fs.BoolVar(&importJPEG, flags.ImportJPEG, false, f.lists.Help(flags.ImportJPEG))
 	f.fs.Var(&sizes, flags.Sizes, f.lists.Help(flags.Sizes))
 
 	f.fs.StringVar(&rawDir, flags.RawDir, "", f.lists.Help(flags.RawDir))
@@ -810,6 +816,7 @@ func (f *Flags) Parse() {
 	f.rating.gt = ratingGTFilter
 	f.rating.lt = ratingLTFilter
 	f.checksum = checksum
+	f.importJPEG = importJPEG
 	f.alwaysYes = alwaysYes
 	f.noRawPrefix = noRawPrefix
 	f.zero = zero
