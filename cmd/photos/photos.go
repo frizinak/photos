@@ -249,20 +249,25 @@ func main() {
 				n = "all"
 				exts = imp.ImageExtList(exts)
 			}
+
+			fsi := false
 			for _, path := range flag.SourceDirs() {
+				fsi = true
 				importer.Register(
 					fmt.Sprintf("filesystem:%s:%s", n, path),
 					fs.New(path, true, exts),
 				)
 			}
 
-			var gp importer.Backend = libgphoto2.New(exts)
-			n = "libgphoto2"
-			if ok, _ := gp.Available(); !ok {
-				gp = gphoto2.New(exts)
-				n = "gphoto2"
+			if !fsi {
+				var gp importer.Backend = libgphoto2.New(exts)
+				n = "libgphoto2"
+				if ok, _ := gp.Available(); !ok {
+					gp = gphoto2.New(exts)
+					n = "gphoto2"
+				}
+				importer.Register(n, gp)
 			}
-			importer.Register(n, gp)
 
 			flag.Exit(imp.Import(flag.Checksum(), progress))
 			progressDone()
