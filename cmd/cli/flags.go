@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"errors"
 	"flag"
 	"fmt"
@@ -793,6 +794,42 @@ func (f *Flags) Parse() {
 
 	f.fs.BoolVar(&verbose, flags.Verbose, false, f.lists.Help(flags.Verbose))
 
+	uconfdir, err := os.UserConfigDir()
+	confArgs := make([]string, 0)
+	if err == nil {
+		confdir := filepath.Join(uconfdir, "photos")
+		conffile := filepath.Join(confdir, "photos.conf")
+		fl, err := os.Open(conffile)
+		if os.IsNotExist(err) {
+			err = nil
+			os.MkdirAll(confdir, 0755)
+			fl, err = os.Create(conffile)
+			f.Err(err)
+			fmt.Fprintln(fl, "# -base /home/user/RAW")
+			//fl.Seek(0, io.SeekStart)
+		}
+		if err != nil {
+			f.Err(fmt.Errorf("failed opening config file '%s': %w", conffile, err))
+		}
+
+		s := bufio.NewScanner(fl)
+		s.Split(bufio.ScanLines)
+		for s.Scan() {
+			t := strings.TrimSpace(s.Text())
+			p := strings.SplitN(t, " ", 2)
+			confArgs = append(confArgs, p[0])
+			if len(p) == 2 {
+				confArgs = append(confArgs, strings.TrimSpace(p[1]))
+			}
+		}
+
+		f.Err(s.Err())
+	}
+
+	if len(confArgs) != 0 {
+		f.Err(f.fs.Parse(confArgs))
+	}
+
 	f.Err(f.fs.Parse(os.Args[1:]))
 
 	if help {
@@ -843,7 +880,6 @@ func (f *Flags) Parse() {
 
 	sints := flags.CommaSep(strings.Join(sizes, ","))
 	f.sizes = make([]int, len(sints))
-	var err error
 	for i, s := range sints {
 		f.sizes[i], err = strconv.Atoi(s)
 		f.Err(err)
