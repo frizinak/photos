@@ -84,10 +84,26 @@ func (i *Importer) scanDir(dir string, cb func(path string) (bool, error)) (bool
 	return true, nil
 }
 
-func (i *Importer) scanLinks(dir string, cb func(LinkInfo) (bool, error)) error {
+func (i *Importer) linkExists(dir string, path string) (bool, error) {
+	if err := i.linkCache(dir); err != nil {
+		return false, err
+	}
+
+	if m, ok := i.symlinkCachePaths[dir]; ok {
+		_, ex := m[path]
+		return ex, nil
+	}
+
+	return false, nil
+}
+
+func (i *Importer) linkCache(dir string) error {
 	i.symlinkSem.Lock()
+	defer i.symlinkSem.Unlock()
 	if _, ok := i.symlinkCache[dir]; !ok {
 		i.symlinkCache[dir] = make([]LinkInfo, 0)
+		i.symlinkCachePaths[dir] = make(map[string]struct{})
+
 		_, err := i.scanDir(dir, func(path string) (bool, error) {
 			fn := filepath.Base(path)
 			if !i.supported(fn) {
@@ -117,6 +133,8 @@ func (i *Importer) scanLinks(dir string, cb func(LinkInfo) (bool, error)) error 
 				i.symlinkCache[dir],
 				LinkInfo{dir: filepath.Dir(path), fn: fn, link: file},
 			)
+
+			i.symlinkCachePaths[dir][file.Path()] = struct{}{}
 			return true, nil
 		})
 		if err != nil {
@@ -124,7 +142,13 @@ func (i *Importer) scanLinks(dir string, cb func(LinkInfo) (bool, error)) error 
 			return err
 		}
 	}
-	i.symlinkSem.Unlock()
+	return nil
+}
+
+func (i *Importer) scanLinks(dir string, cb func(LinkInfo) (bool, error)) error {
+	if err := i.linkCache(dir); err != nil {
+		return err
+	}
 
 	i.symlinkSem.RLock()
 	defer i.symlinkSem.RUnlock()
@@ -167,14 +191,7 @@ func (i *Importer) Link(f *File) error {
 	}
 
 	os.MkdirAll(i.colDir, 0755)
-	exists := false
-	err = i.scanLinks(i.colDir, func(l LinkInfo) (bool, error) {
-		if l.link.Path() == real {
-			exists = true
-			return false, nil
-		}
-		return true, nil
-	})
+	exists, err := i.linkExists(i.colDir, real)
 
 	if err != nil || exists {
 		return err

@@ -355,7 +355,7 @@ func main() {
 			if len(t) == 0 {
 				return
 			}
-			work(100, func(f *importer.File) (workCB, error) {
+			work(-1, func(f *importer.File) (workCB, error) {
 				m, err := importer.GetMeta(f)
 				if err != nil {
 					return nil, err
@@ -390,7 +390,7 @@ func main() {
 				mp[tag] = struct{}{}
 			}
 
-			work(100, func(f *importer.File) (workCB, error) {
+			work(-1, func(f *importer.File) (workCB, error) {
 				m, err := importer.GetMeta(f)
 				if err != nil {
 					return nil, err
@@ -417,7 +417,7 @@ func main() {
 		flags.ActionLink: func() {
 			l.Println("linking")
 			imp.ClearCache()
-			work(100, func(f *importer.File) (workCB, error) {
+			work(-1, func(f *importer.File) (workCB, error) {
 				return func() error { return imp.Link(f) }, nil
 			})
 			imp.ClearCache()
@@ -631,7 +631,7 @@ Exposure: %s
 				done <- struct{}{}
 			}()
 
-			workNoProgress(100, func(f *importer.File) (workCB, error) {
+			workNoProgress(-1, func(f *importer.File) (workCB, error) {
 				return func() error {
 					l := make([]string, len(args)-1)
 					for i := 1; i < len(args); i++ {
@@ -668,7 +668,7 @@ Exposure: %s
 			l.Println("assembling files")
 			var sem sync.Mutex
 			list := make([]gphotos.UploadTask, 0)
-			work(100, func(f *importer.File) (workCB, error) {
+			work(-1, func(f *importer.File) (workCB, error) {
 				return func() error {
 					m, err := importer.GetMeta(f)
 					if err != nil {
@@ -723,7 +723,7 @@ Exposure: %s
 
 			docs := gtimeline.New(glocationDir)
 			var first, last time.Time
-			work(100, func(f *importer.File) (workCB, error) {
+			work(-1, func(f *importer.File) (workCB, error) {
 				m, err := importer.GetMeta(f)
 				if err != nil {
 					return nil, err
@@ -755,7 +755,7 @@ Exposure: %s
 			flag.Exit(err)
 
 			l.Println("updating meta with google timeline location information")
-			work(100, func(f *importer.File) (workCB, error) {
+			work(-1, func(f *importer.File) (workCB, error) {
 				m, err := importer.GetMeta(f)
 				if err != nil {
 					return nil, err

@@ -57,8 +57,9 @@ type Importer struct {
 	colDir  string
 	convDir string
 
-	symlinkSem   sync.RWMutex
-	symlinkCache map[string][]LinkInfo
+	symlinkSem        sync.RWMutex
+	symlinkCache      map[string][]LinkInfo
+	symlinkCachePaths map[string]map[string]struct{}
 }
 
 func New(log, verbose *log.Logger, rawDir, colDir, convDir string) *Importer {
@@ -74,6 +75,7 @@ func New(log, verbose *log.Logger, rawDir, colDir, convDir string) *Importer {
 func (i *Importer) ClearCache() {
 	i.symlinkSem.Lock()
 	i.symlinkCache = make(map[string][]LinkInfo)
+	i.symlinkCachePaths = make(map[string]map[string]struct{})
 	i.symlinkSem.Unlock()
 }
 
