@@ -112,18 +112,42 @@ var lists = Lists{
 	flags.Actions: {
 		help: "list of actions (comma separated and/or specified multiple times)",
 		list: map[string][]string{
-			flags.ActionImport:       {"Import media from connected camera (gphoto2) and any given directory (-source) to the directory specified with -raws"},
-			flags.ActionShow:         {"Show raws (filter with -filter)"},
-			flags.ActionShowPreviews: {"Show jpegs (filter with -filter) (see -no-raw)"},
-			flags.ActionShowJPEGs:    {"Show previews (filter with -filter) (see -no-raw)"},
-			flags.ActionShowLinks:    {"Show links (filter with -filter) (see -no-raw)"},
-			flags.ActionShowTags:     {"Show all tags"},
-			flags.ActionInfo:         {"Show info (filter with -filter)"},
-			flags.ActionLink:         {"Create collection symlinks in the given directory (-collection)"},
-			flags.ActionPreviews:     {"Generate simple jpeg previews (used by -action rate)"},
-			flags.ActionRate:         {"Simple opengl window to rate / trash images (filter with -filter)"},
-			flags.ActionSyncMeta:     {"Sync .meta file with .pp3 (file mtime determines which one is the authority) and filesystem"},
-			flags.ActionRewriteMeta:  {"Rewrite .meta, make sure you synced first so newer pp3s are not overwritten."},
+			flags.ActionImport: {
+				"Import media from connected camera (gphoto2) and any given directory (-source) to the directory specified with -raws",
+			},
+			flags.ActionShow: {
+				"Show raws (filter with -filter)",
+			},
+			flags.ActionShowPreviews: {
+				"Show jpegs (filter with -filter) (see -no-raw)",
+			},
+			flags.ActionShowJPEGs: {
+				"Show previews (filter with -filter) (see -no-raw)",
+			},
+			flags.ActionShowLinks: {
+				"Show links (filter with -filter) (see -no-raw)",
+			},
+			flags.ActionShowTags: {
+				"Show all tags",
+			},
+			flags.ActionInfo: {
+				"Show info (filter with -filter)",
+			},
+			flags.ActionLink: {
+				"Create collection symlinks in the given directory (-collection)",
+			},
+			flags.ActionPreviews: {
+				"Generate simple jpeg previews (used by -action rate)",
+			},
+			flags.ActionRate: {
+				"Simple opengl window to rate / trash images (filter with -filter)",
+			},
+			flags.ActionSyncMeta: {
+				"Sync .meta file with .pp3 (file mtime determines which one is the authority) and filesystem",
+			},
+			flags.ActionRewriteMeta: {
+				"Rewrite .meta, make sure you synced first so newer pp3s are not overwritten.",
+			},
 			flags.ActionConvert: {
 				"Convert images to jpegs resized with -sizes (filter with -filter)",
 				"These conversions are tracked in .meta i.e.:",
@@ -142,35 +166,65 @@ var lists = Lists{
 				"Images whose rating is not higher than -gt will also have their jpegs deleted.",
 				"!Note: .meta files are seen as the single source of truth, so run sync-meta before",
 			},
-			flags.ActionTagsRemove: {"Remove tags (first non flag argument are the tags that will be removed)"},
-			flags.ActionTagsAdd:    {"Add tag (first non flag argument are the tags that will be removed)"},
-			flags.ActionGPhotos:    {"Upload converted photos to google photos"},
+			flags.ActionTagsRemove: {
+				"Remove tags (first non flag argument are the tags that will be removed)",
+			},
+			flags.ActionTagsAdd: {
+				"Add tag (first non flag argument are the tags that will be removed)",
+			},
+			flags.ActionGPhotos: {
+				"Upload converted photos to google photos",
+			},
 			flags.ActionGLocation: {
 				"Update meta with location information extracted from google timeline kmls",
 				"requires -glocation flag with a directory where you downloaded history-YYYY-MM-DD.kml files",
 			},
 		},
 	},
-
 	flags.Filters: {
 		help: "[any] filters (comma separated and/or specified multiple times)",
 		list: map[string][]string{
-			flags.FilterUndeleted:  {"ignore trashed/deleted files"},
-			flags.FilterDeleted:    {"only include trashed/deleted files"},
-			flags.FilterUpdated:    {"only include files that need to be converted (updated pp3). be sure to pass the correct -sizes"},
-			flags.FilterUnedited:   {"only include files with incomplete pp3s (never opened in rawtherapee)"},
-			flags.FilterEdited:     {"only include files with complete pp3s (have been opened in rawtherapee)"},
-			flags.FilterRated:      {"only include rated files"},
-			flags.FilterUnrated:    {"only include unrated files"},
-			flags.FilterLocation:   {"only include files with a location"},
-			flags.FilterNoLocation: {"only include files with no location"},
+			flags.FilterUndeleted: {
+				"ignore trashed/deleted files",
+			},
+			flags.FilterDeleted: {
+				"only include trashed/deleted files",
+			},
+			flags.FilterUpdated: {
+				"only include files that need to be converted (updated pp3). be sure to pass the correct -sizes",
+			},
+			flags.FilterUnedited: {
+				"only include files with incomplete pp3s (never opened in rawtherapee)",
+			},
+			flags.FilterEdited: {
+				"only include files with complete pp3s (have been opened in rawtherapee)",
+			},
+			flags.FilterRated: {
+				"only include rated files",
+			},
+			flags.FilterUnrated: {
+				"only include unrated files",
+			},
+			flags.FilterLocation: {
+				"only include files with a location",
+			},
+			flags.FilterNoLocation: {
+				"only include files with no location",
+			},
 		},
 	},
-
-	flags.GT:     {help: "[any] greater than given rating filter"},
-	flags.LT:     {help: "[any] less than given rating filter"},
-	flags.Camera: {help: "[any] filter camera make and model (* as wildcard, case insensitive)"},
-	flags.Lens:   {help: "[any] filter lens make and model (* as wildcard, case insensitive)"},
+	flags.GT: {
+		help: "[any] greater than given rating filter",
+	},
+	flags.LT: {
+		help: "[any] less than given rating filter",
+	},
+	flags.Camera: {
+		help: "[any] filter camera make and model (* as wildcard, case insensitive)",
+	},
+	flags.Lens: {
+		help: "[any] filter lens make and model (* as wildcard, case insensitive)",
+	},
 	flags.Exposure: {
 		help: "[any] filter exposure settings",
 		list: map[string][]string{
@@ -183,10 +237,18 @@ var lists = Lists{
 			},
 		},
 	},
-	flags.File:  {help: "[any] filter original filename (* as wildcard, case insensitive)"},
-	flags.Ext:   {help: "[any] filter original file extension (case insensitive)"},
-	flags.Since: {help: "[any] since time filter [Y-m-d (H:M)]"},
-	flags.Until: {help: "[any] until time filter [Y-m-d (H:M)]"},
+	flags.File: {
+		help: "[any] filter original filename (* as wildcard, case insensitive)",
+	},
+	flags.Ext: {
+		help: "[any] filter original file extension (case insensitive)",
+	},
+	flags.Since: {
+		help: "[any] since time filter [Y-m-d (H:M)]",
+	},
+	flags.Until: {
+		help: "[any] until time filter [Y-m-d (H:M)]",
+	},
 	flags.Tags: {
 		help: `[any] tag filter, comma separated <or> can be specified multiple times <and>, ^ to negate a single tag
 e.g:
@@ -197,8 +259,12 @@ special case: '-' only matches files with no tags
 special case: '*' only matches files with tags`,
 	},
 
-	flags.Checksum:   {help: "[import] dry-run and report non-identical files with duplicate filenames"},
-	flags.ImportJPEG: {help: "[import] also import jpegs"},
+	flags.Checksum: {
+		help: "[import] dry-run and report non-identical files with duplicate filenames",
+	},
+	flags.ImportJPEG: {
+		help: "[import] also import jpegs",
+	},
 	flags.Sizes: {
 		help: "comma separated and/or specified multiple times (e.g.: 3840,1920,800)",
 		list: map[string][]string{
@@ -209,28 +275,47 @@ special case: '*' only matches files with tags`,
 			"[gphotos]":    {"filter on jpeg sizes"},
 		},
 	},
-
-	flags.RawDir:        {help: "[any] Raw directory"},
-	flags.CollectionDir: {help: "[any] Collection directory"},
-	flags.JPEGDir:       {help: "[convert] JPEG directory"},
-	flags.BaseDir: {help: `[all] Set a basedir which implies:
+	flags.RawDir: {
+		help: "[any] Raw directory",
+	},
+	flags.CollectionDir: {
+		help: "[any] Collection directory",
+	},
+	flags.JPEGDir: {
+		help: "[convert] JPEG directory",
+	},
+	flags.BaseDir: {
+		help: `[all] Set a basedir which implies:
 -raws (if not given)       = <basedir>/Originals
 -collection (if not given) = <basedir>/Collection
 -jpegs (if not given)      = <basedir>/Converted
--gphotos (if not given)    = <basedir>/gphotos.credentials`},
-	flags.GPhotosCredentials: {help: "[gphotos] path to the google credentials file"},
+-gphotos (if not given)    = <basedir>/gphotos.credentials`,
+	},
+	flags.GPhotosCredentials: {
+		help: "[gphotos] path to the google credentials file",
+	},
 	flags.GLocationDirectory: {
 		help: "[glocation] directory holding history-YYYY-MM-DD.kml files",
 	},
-
-	flags.MaxWorkers: {help: "[all] maximum amount of threads"},
-	flags.SourceDir:  {help: "[import] filesystem paths to import from, can be specified multiple times"},
-
-	flags.AlwaysYes: {help: "always answer yes"},
-	flags.Zero: {help: `all stdout output will be separated by a null byte
-e.g.: photos -base . -0 -action show-jpegs -no-raw | xargs -0 feh`},
-	flags.NoRawPrefix: {help: "[show-*] don't prefix output with the corresponding raw file"},
-	flags.Verbose:     {help: "enable verbose stderr logging"},
+	flags.MaxWorkers: {
+		help: "[all] maximum amount of threads",
+	},
+	flags.SourceDir: {
+		help: "[import] filesystem paths to import from, can be specified multiple times",
+	},
+	flags.AlwaysYes: {
+		help: "always answer yes",
+	},
+	flags.Zero: {
+		help: `all stdout output will be separated by a null byte
+e.g.: photos -base . -0 -action show-jpegs -no-raw | xargs -0 feh`,
+	},
+	flags.NoRawPrefix: {
+		help: "[show-*] don't prefix output with the corresponding raw file",
+	},
+	flags.Verbose: {
+		help: "enable verbose stderr logging",
+	},
 }
 
 type Flags struct {
