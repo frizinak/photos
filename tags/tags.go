@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"image"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"regexp"
@@ -303,6 +304,61 @@ func EditJPEGExif(file string, out io.Writer, cbs ...func(*exif.IfdBuilder) (boo
 	}
 
 	return rd.Write(out)
+}
+
+func JPEGExifGPS(lat, lng float64) func(*exif.IfdBuilder) (bool, error) {
+	hms := func(v float64) (h, m, s float64) {
+		h = float64(int(v))
+		m = float64(int((v - h) * 60))
+		s = (v - h - m/60) * 3600
+		return
+	}
+	hms24 := func(v float64) []byte {
+		valh, valm, vals := hms(v)
+
+		val := make([]byte, 24)
+		binary.BigEndian.PutUint32(val[0:], uint32(valh))
+		binary.BigEndian.PutUint32(val[4:], 1)
+		binary.BigEndian.PutUint32(val[8:], uint32(valm))
+		binary.BigEndian.PutUint32(val[12:], 1)
+		binary.BigEndian.PutUint32(val[16:], uint32(vals*100000))
+		binary.BigEndian.PutUint32(val[20:], 100000)
+		return val
+	}
+
+	return func(b *exif.IfdBuilder) (bool, error) {
+		// exifBuilder, err := b.ChildWithTagId(0x8825)
+		exifBuilder, err := exif.GetOrCreateIbFromRootIb(b, "IFD/GPSInfo")
+		if err != nil {
+			return false, err
+		}
+
+		latref, lngref := "N", "E"
+		if lat < 0 {
+			latref = "S"
+		}
+		if lng < 0 {
+			lngref = "W"
+		}
+
+		latvalue := hms24(math.Abs(lat))
+		lngvalue := hms24(math.Abs(lng))
+		if err := exifBuilder.SetStandard(0x0001, latref); err != nil {
+			return false, err
+		}
+		if err := exifBuilder.SetStandard(0x0002, latvalue); err != nil {
+			return false, err
+		}
+		if err := exifBuilder.SetStandard(0x0003, lngref); err != nil {
+			return false, err
+		}
+		if err := exifBuilder.SetStandard(0x0004, lngvalue); err != nil {
+			return false, err
+		}
+
+		return true, nil
+	}
+
 }
 
 func JPEGExifTZ(ts time.Time, force bool) func(*exif.IfdBuilder) (bool, error) {

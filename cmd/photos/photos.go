@@ -782,6 +782,31 @@ Exposure: %s
 					return importer.SaveMeta(f, m)
 				}, nil
 			})
+
+			l.Println("updating converted jpegs with new location information")
+			work(-1, func(f *importer.File) (workCB, error) {
+				m, err := importer.GetMeta(f)
+				if err != nil {
+					return nil, err
+				}
+
+				c := m.CreatedTime()
+				_, ll, err := docs.GetLatLng(c, extraDays)
+				if err != nil {
+					return func() error { return nil }, nil
+				}
+
+				return func() error {
+					for file := range m.Conv {
+						err := imp.JPEGGPS(file, ll.Lat, ll.Lng)
+						if err != nil {
+							return err
+						}
+					}
+					return nil
+				}, nil
+
+			})
 		},
 	}
 

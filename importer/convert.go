@@ -15,7 +15,7 @@ import (
 	"github.com/frizinak/photos/tags"
 )
 
-func (i *Importer) convert(input, output string, pp *pp3.PP3, created time.Time) error {
+func (i *Importer) convert(input, output string, pp *pp3.PP3, created time.Time, lat, lng *float64) error {
 	pp3TempPath := fmt.Sprintf("%s.tmp.pp3", output)
 	err := pp.SaveTo(pp3TempPath)
 	defer os.Remove(pp3TempPath)
@@ -51,11 +51,34 @@ func (i *Importer) convert(input, output string, pp *pp3.PP3, created time.Time)
 		return err
 	}
 
+	if lat != nil && lng != nil {
+		if err := i.jpegGPS(tmp, *lat, *lng); err != nil {
+			os.Remove(tmp)
+			return err
+		}
+	}
+
 	if tmp != output {
 		return os.Rename(tmp, output)
 	}
 
 	return nil
+}
+
+func (i *Importer) JPEGGPS(conv string, lat, lng float64) error {
+	return i.jpegGPS(filepath.Join(i.convDir, conv), lat, lng)
+}
+
+func (i *Importer) jpegGPS(file string, lat, lng float64) error {
+	tmp := file + ".tmp.gps"
+	out, _ := os.Create(tmp)
+	err := tags.EditJPEGExif(file, out, tags.JPEGExifGPS(lat, lng))
+	out.Close()
+	if err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return os.Rename(tmp, file)
 }
 
 func (i *Importer) FixJPEGTZ(file string, t time.Time) error {
@@ -75,6 +98,7 @@ func (i *Importer) FixJPEGTZ(file string, t time.Time) error {
 }
 
 func (i *Importer) convertIfUpdated(
+	loc *meta.Location,
 	link,
 	dir,
 	output string,
@@ -109,7 +133,11 @@ func (i *Importer) convertIfUpdated(
 		return true, rel, nil
 	}
 	os.MkdirAll(filepath.Dir(output), 0755)
-	return true, rel, i.convert(link, output, pp, created)
+	var lat, lng *float64
+	if loc != nil {
+		lat, lng = &loc.Lat, &loc.Lng
+	}
+	return true, rel, i.convert(link, output, pp, created, lat, lng)
 }
 
 func (i *Importer) Unedited(f *File) (bool, error) {
@@ -195,6 +223,7 @@ func (i *Importer) fileConvert(f *File, sizes []int, checkOnly bool) (bool, erro
 			fn = fn[0 : len(fn)-len(ext)]
 			output := filepath.Join(dir, strconv.Itoa(s), fn)
 			conv, rel, err := i.convertIfUpdated(
+				m.Location,
 				links[n],
 				i.convDir,
 				output,

@@ -70,7 +70,7 @@ func (rt *rtPreviewGen) Make(i *Importer, f *File, output string) error {
 		return err
 	}
 	pp.ResizeLongest(1920)
-	if err := i.convert(f.Path(), tmp, pp, time.Time{}); err != nil {
+	if err := i.convert(f.Path(), tmp, pp, time.Time{}, nil, nil); err != nil {
 		return err
 	}
 
