@@ -798,7 +798,7 @@ Exposure: %s
 
 				return func() error {
 					for file := range m.Conv {
-						err := imp.JPEGGPS(file, ll.Lat, ll.Lng)
+						err := imp.JPEGGPS(file, c, ll.Lat, ll.Lng)
 						if err != nil {
 							return err
 						}

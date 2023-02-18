@@ -52,7 +52,7 @@ func (i *Importer) convert(input, output string, pp *pp3.PP3, created time.Time,
 	}
 
 	if lat != nil && lng != nil {
-		if err := i.jpegGPS(tmp, *lat, *lng); err != nil {
+		if err := i.jpegGPS(tmp, created, *lat, *lng); err != nil {
 			os.Remove(tmp)
 			return err
 		}
@@ -65,14 +65,14 @@ func (i *Importer) convert(input, output string, pp *pp3.PP3, created time.Time,
 	return nil
 }
 
-func (i *Importer) JPEGGPS(conv string, lat, lng float64) error {
-	return i.jpegGPS(filepath.Join(i.convDir, conv), lat, lng)
+func (i *Importer) JPEGGPS(conv string, created time.Time, lat, lng float64) error {
+	return i.jpegGPS(filepath.Join(i.convDir, conv), created, lat, lng)
 }
 
-func (i *Importer) jpegGPS(file string, lat, lng float64) error {
+func (i *Importer) jpegGPS(file string, created time.Time, lat, lng float64) error {
 	tmp := file + ".tmp.gps"
 	out, _ := os.Create(tmp)
-	err := tags.EditJPEGExif(file, out, tags.JPEGExifGPS(lat, lng))
+	err := tags.EditJPEGExif(file, out, tags.JPEGExifGPS(created, lat, lng))
 	out.Close()
 	if err != nil {
 		os.Remove(tmp)

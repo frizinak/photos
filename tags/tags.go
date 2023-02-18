@@ -306,24 +306,31 @@ func EditJPEGExif(file string, out io.Writer, cbs ...func(*exif.IfdBuilder) (boo
 	return rd.Write(out)
 }
 
-func JPEGExifGPS(lat, lng float64) func(*exif.IfdBuilder) (bool, error) {
+func JPEGExifGPS(created time.Time, lat, lng float64) func(*exif.IfdBuilder) (bool, error) {
 	hms := func(v float64) (h, m, s float64) {
 		h = float64(int(v))
 		m = float64(int((v - h) * 60))
 		s = (v - h - m/60) * 3600
 		return
 	}
-	hms24 := func(v float64) []byte {
-		valh, valm, vals := hms(v)
 
-		val := make([]byte, 24)
-		binary.BigEndian.PutUint32(val[0:], uint32(valh))
-		binary.BigEndian.PutUint32(val[4:], 1)
-		binary.BigEndian.PutUint32(val[8:], uint32(valm))
-		binary.BigEndian.PutUint32(val[12:], 1)
-		binary.BigEndian.PutUint32(val[16:], uint32(vals*100000))
-		binary.BigEndian.PutUint32(val[20:], 100000)
+	hms24 := func(values []float64, denoms []uint32) []byte {
+		if len(values) != len(denoms) {
+			panic("every value should match one denom")
+		}
+		val := make([]byte, 8*len(values))
+		off := 0
+		for i := range values {
+			binary.LittleEndian.PutUint32(val[off+0:], uint32(values[i]*float64(denoms[i])))
+			binary.LittleEndian.PutUint32(val[off+4:], denoms[i])
+			off += 8
+		}
 		return val
+	}
+
+	coords := func(v float64) []byte {
+		valh, valm, vals := hms(v)
+		return hms24([]float64{valh, valm, vals}, []uint32{1, 1, 10000})
 	}
 
 	return func(b *exif.IfdBuilder) (bool, error) {
@@ -341,8 +348,8 @@ func JPEGExifGPS(lat, lng float64) func(*exif.IfdBuilder) (bool, error) {
 			lngref = "W"
 		}
 
-		latvalue := hms24(math.Abs(lat))
-		lngvalue := hms24(math.Abs(lng))
+		latvalue := coords(math.Abs(lat))
+		lngvalue := coords(math.Abs(lng))
 		if err := exifBuilder.SetStandard(0x0001, latref); err != nil {
 			return false, err
 		}
@@ -353,6 +360,18 @@ func JPEGExifGPS(lat, lng float64) func(*exif.IfdBuilder) (bool, error) {
 			return false, err
 		}
 		if err := exifBuilder.SetStandard(0x0004, lngvalue); err != nil {
+			return false, err
+		}
+
+		utc := created.UTC()
+		timevalue := hms24(
+			[]float64{float64(utc.Hour()), float64(utc.Minute()), float64(utc.Second())},
+			[]uint32{1, 1, 1},
+		)
+		if err := exifBuilder.SetStandard(0x0007, timevalue); err != nil {
+			return false, err
+		}
+		if err := exifBuilder.SetStandard(0x001d, utc.Format("2006:01:02")); err != nil {
 			return false, err
 		}
 
