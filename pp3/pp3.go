@@ -210,18 +210,21 @@ func (pp *PP3) ResizeLongest(size int) {
 	width := pp.Key("Crop", "W").MustInt()
 	height := pp.Key("Crop", "H").MustInt()
 	which := "1"
+	rat := float64(width) / float64(height)
+	w, h := size, int(float64(size)/rat)
 	if height > width {
+		w, h = int(float64(size)*rat), size
 		which = "2"
 	}
 
-	s := strconv.Itoa(size)
+	ws, hs := strconv.Itoa(w), strconv.Itoa(h)
 
 	pp.Set("Resize", "Enabled", "true")
 	pp.Set("Resize", "Scale", "1")
 	pp.Set("Resize", "AppliesTo", "Cropped area")
 	pp.Set("Resize", "Method", "Lanczos")
 	pp.Set("Resize", "DataSpecified", which)
-	pp.Set("Resize", "Width", s)
-	pp.Set("Resize", "Height", s)
+	pp.Set("Resize", "Width", ws)
+	pp.Set("Resize", "Height", hs)
 	pp.Set("Resize", "AllowUpscaling", "false")
 }
