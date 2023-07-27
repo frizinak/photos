@@ -914,12 +914,40 @@ func (r *Rater) Run() error {
 			return nil
 		}
 
-		f, err := importer.GetPreview(r.file())
-		if err != nil {
-			log.Printf("WARN could not get preview for %s: %s", r.file().Path(), err)
-			tex = 0
-			return nil
+		var f io.ReadCloser
+		rf := r.file()
+
+		if m, err := importer.GetMeta(rf); err == nil {
+			var closest string
+			var diff int = math.MaxInt
+			for k, c := range m.Conv {
+				d := 3840 - c.Size
+				if d < 0 {
+					d = -d
+				}
+				if d < diff {
+					diff = d
+					closest = k
+				}
+			}
+
+			if closest != "" {
+				f, err = os.Open(filepath.Join(r.compl.imp.ConvDir(), closest))
+				if err != nil {
+					f = nil
+				}
+			}
 		}
+
+		if f == nil {
+			f, err = importer.GetPreview(rf)
+			if err != nil {
+				log.Printf("WARN could not get preview for %s: %s", rf.Path(), err)
+				tex = 0
+				return nil
+			}
+		}
+
 		img, _, err := image.Decode(f)
 		f.Close()
 		if err != nil {
