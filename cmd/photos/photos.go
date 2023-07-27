@@ -451,7 +451,7 @@ func main() {
 				return
 			}
 
-			rater, err := rate.New(l, list, imp)
+			rater, err := rate.New(l, list, imp, flag.Editor())
 			flag.Exit(err)
 			flag.Exit(rater.Run())
 		},

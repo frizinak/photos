@@ -317,6 +317,9 @@ e.g.: photos -base . -0 -action show-jpegs -no-raw | xargs -0 feh`,
 	flags.Verbose: {
 		help: "enable verbose stderr logging",
 	},
+	flags.Editor: {
+		help: "command to run when editing images using phodo",
+	},
 }
 
 type Flags struct {
@@ -350,6 +353,8 @@ type Flags struct {
 	alwaysYes bool
 
 	verbose bool
+
+	editor string
 
 	sizes []int
 
@@ -411,6 +416,8 @@ func (f *Flags) RatingGT() int { return f.rating.gt }
 func (f *Flags) RatingLT() int { return f.rating.lt }
 
 func (f *Flags) Verbose() bool { return f.verbose }
+
+func (f *Flags) Editor() string { return f.editor }
 
 func (f *Flags) GPhotosCredentials() string { return f.gphotos }
 func (f *Flags) GLocationDirectory() string { return f.glocation }
@@ -755,6 +762,7 @@ func (f *Flags) Parse() {
 	var help bool
 	var importJPEG bool
 	var verbose bool
+	var editor string
 
 	f.fs.BoolVar(&help, "h", false, "\nhelp\n")
 	f.fs.Var(&actions, flags.Actions, f.lists.Help(flags.Actions))
@@ -793,6 +801,8 @@ func (f *Flags) Parse() {
 	f.fs.BoolVar(&noRawPrefix, flags.NoRawPrefix, false, f.lists.Help(flags.NoRawPrefix))
 
 	f.fs.BoolVar(&verbose, flags.Verbose, false, f.lists.Help(flags.Verbose))
+
+	f.fs.StringVar(&editor, flags.Editor, "vim", f.lists.Help(flags.Editor))
 
 	uconfdir, err := os.UserConfigDir()
 	confArgs := make([]string, 0)
