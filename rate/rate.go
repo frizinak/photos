@@ -502,6 +502,7 @@ func (r *Rater) edit(file string) {
 		r.main()
 	}()
 	conf := phodo.NewConf(os.Stderr, nil)
+	conf.EditorString = r.editingEditor
 	if err := phodo.Editor(context.Background(), conf, file); err != nil {
 		r.fatal(err)
 	}

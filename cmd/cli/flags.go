@@ -956,6 +956,7 @@ func (f *Flags) Parse() {
 	f.gphotos = gphotos
 	f.glocation = glocation
 	f.verbose = verbose
+	f.editor = editor
 
 	f.log = log.New(os.Stderr, "", log.LstdFlags)
 	if !verbose {
