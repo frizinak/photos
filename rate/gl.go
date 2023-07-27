@@ -8,7 +8,7 @@ import (
 	"image"
 	"strings"
 
-	"github.com/go-gl/gl/v4.1-core/gl"
+	"github.com/go-gl/gl/v4.6-core/gl"
 )
 
 func imgTexture(img *image.RGBA) (uint32, error) {

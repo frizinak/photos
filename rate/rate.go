@@ -4,21 +4,25 @@
 package rate
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"image"
 	"image/draw"
 	_ "image/jpeg"
+	"io"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 
+	"github.com/frizinak/phodo/phodo"
 	"github.com/frizinak/photos/importer"
 	"github.com/frizinak/photos/meta"
-	"github.com/go-gl/gl/v4.1-core/gl"
+	"github.com/go-gl/gl/v4.6-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/go-gl/mathgl/mgl32"
 )
@@ -59,7 +63,7 @@ func initialize() (*glfw.Window, error) {
 	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
 	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 	glfw.WindowHint(glfw.ContextVersionMajor, 4)
-	glfw.WindowHint(glfw.ContextVersionMinor, 1)
+	glfw.WindowHint(glfw.ContextVersionMinor, 6)
 	glfw.WindowHint(glfw.DoubleBuffer, 1)
 	window, err := glfw.CreateWindow(
 		800,
@@ -84,13 +88,16 @@ type Rater struct {
 
 	realWidth, realHeight int
 
-	fullscreen bool
-	zoom       bool
-	auto       bool
-	tagging    bool
-	text       bool
-	inputCB    func([]rune) error
-	input      []rune
+	fullscreen    bool
+	zoom          bool
+	auto          bool
+	tagging       bool
+	editingList   []string
+	editingChoice []rune
+	editingEditor string
+	text          bool
+	inputCB       func([]rune) error
+	input         []rune
 
 	index int
 
@@ -121,8 +128,8 @@ type Rater struct {
 	log   *log.Logger
 }
 
-func New(log *log.Logger, files []*importer.File, imp *importer.Importer) (*Rater, error) {
-	r := &Rater{files: files, log: log}
+func New(log *log.Logger, files []*importer.File, imp *importer.Importer, editor string) (*Rater, error) {
+	r := &Rater{files: files, log: log, editingEditor: editor}
 	r.compl.imp = imp
 
 	r.term.clrRed = "\033[48;5;124m"
@@ -186,13 +193,17 @@ func (r *Rater) initCompletion() {
 	}
 }
 
+func (r *Rater) main() {
+	r.text = false
+	r.clear()
+	r.print(r.file())
+	r.usage()
+}
+
 func (r *Rater) toggleTagging() {
 	r.tagging = !r.tagging
 	if !r.tagging {
-		r.text = false
-		r.clear()
-		r.print(r.file())
-		r.usage()
+		r.main()
 	}
 }
 
@@ -218,11 +229,21 @@ func commaSep(v string) []string {
 }
 
 func (r *Rater) onKey(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-	if r.tagging {
-		help := func(file *importer.File) {
-			r.clear()
-			r.print(file)
-			fmt.Printf(`
+	switch {
+	case r.tagging:
+		r.onKeyTagging(w, key, scancode, action, mods)
+	case len(r.editingList) != 0:
+		r.onKeyEditing(w, key, scancode, action, mods)
+	case action != glfw.Release:
+		r.onKeyMain(w, key, scancode, action, mods)
+	}
+}
+
+func (r *Rater) onKeyTagging(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	help := func(file *importer.File) {
+		r.clear()
+		r.print(file)
+		fmt.Printf(`
 %s%sTAGGING%s
 a            : add tag(s)
 d            : delete tag(s)
@@ -230,193 +251,265 @@ c            : copy tags from previous image
 m            : modify tags
 q | esc      : cancel
 `,
-				r.term.clrBlue,
-				r.term.clrBlueContrast,
-				r.term.none,
-			)
+			r.term.clrBlue,
+			r.term.clrBlueContrast,
+			r.term.none,
+		)
 
-		}
+	}
 
-		if r.text {
-			if action == glfw.Release {
-				return
-			}
-
-			if key != glfw.KeyTab {
-				r.compl.state.index = -1
-				r.compl.state.prefix = ""
-			}
-
-			switch key {
-			case glfw.KeyBackspace:
-				if len(r.input) != 0 {
-					r.input = r.input[0 : len(r.input)-1]
-					fmt.Print("\b\033[K")
-				}
-			case glfw.KeyTab:
-				if len(r.input) == 0 || r.input[len(r.input)-1] == ',' {
-					return
-				}
-
-				if r.compl.state.index != -1 && len(r.compl.state.suffix) > 0 {
-					prev := r.compl.state.suffix[r.compl.state.index]
-					for range prev {
-						fmt.Print("\b")
-					}
-					fmt.Print("\033[K")
-					r.input = r.input[0 : len(r.input)-len(prev)]
-				}
-
-				list := commaSep(string(r.input))
-				last := list[len(list)-1]
-				if last != r.compl.state.prefix {
-					r.compl.state.prefix = last
-					r.compl.state.suffix = r.completion(last)
-					r.compl.state.index = -1
-				}
-
-				if len(r.compl.state.suffix) == 0 {
-					return
-				}
-
-				r.compl.state.index++
-				if r.compl.state.index > len(r.compl.state.suffix)-1 {
-					r.compl.state.index = 0
-				}
-
-				rest := r.compl.state.suffix[r.compl.state.index]
-				if rest != "" {
-					r.input = append(r.input, []rune(rest)...)
-					fmt.Print(rest)
-				}
-			case glfw.KeyEnter:
-				if r.inputCB != nil {
-					if err := r.inputCB(r.input); err != nil {
-						r.log.Println(err)
-					}
-				}
-				r.text = false
-				r.input = make([]rune, 0)
-				help(r.file())
-				r.nextIfAuto()
-			case glfw.KeyEscape:
-				r.inputCB = nil
-				if r.text {
-					r.text = false
-				} else if r.tagging {
-					r.toggleTagging()
-				}
-			}
+	if r.text {
+		if action == glfw.Release {
 			return
 		}
 
-		if action != glfw.Release {
-			return
+		if key != glfw.KeyTab {
+			r.compl.state.index = -1
+			r.compl.state.prefix = ""
 		}
 
-		file := r.file()
-		help(file)
 		switch key {
-		case glfw.KeyQ, glfw.KeyEscape:
-			r.toggleTagging()
-
-		case glfw.KeyC:
-			var last meta.Tags
-			if r.index == 0 {
+		case glfw.KeyBackspace:
+			if len(r.input) != 0 {
+				r.input = r.input[0 : len(r.input)-1]
+				fmt.Print("\b\033[K")
+			}
+		case glfw.KeyTab:
+			if len(r.input) == 0 || r.input[len(r.input)-1] == ',' {
 				return
 			}
-			r.updateMeta(r.getFile(r.index-1), func(m *meta.Meta) (bool, error) {
-				last = m.Tags
-				return false, nil
-			})
-			r.updateMeta(file, func(m *meta.Meta) (bool, error) {
-				for _, t := range last {
-					m.Tags = append(m.Tags, t)
-					r.addCompletion(t)
-				}
-				return true, nil
-			})
-			help(file)
 
-		case glfw.KeyA:
+			if r.compl.state.index != -1 && len(r.compl.state.suffix) > 0 {
+				prev := r.compl.state.suffix[r.compl.state.index]
+				for range prev {
+					fmt.Print("\b")
+				}
+				fmt.Print("\033[K")
+				r.input = r.input[0 : len(r.input)-len(prev)]
+			}
+
+			list := commaSep(string(r.input))
+			last := list[len(list)-1]
+			if last != r.compl.state.prefix {
+				r.compl.state.prefix = last
+				r.compl.state.suffix = r.completion(last)
+				r.compl.state.index = -1
+			}
+
+			if len(r.compl.state.suffix) == 0 {
+				return
+			}
+
+			r.compl.state.index++
+			if r.compl.state.index > len(r.compl.state.suffix)-1 {
+				r.compl.state.index = 0
+			}
+
+			rest := r.compl.state.suffix[r.compl.state.index]
+			if rest != "" {
+				r.input = append(r.input, []rune(rest)...)
+				fmt.Print(rest)
+			}
+		case glfw.KeyEnter:
+			if r.inputCB != nil {
+				if err := r.inputCB(r.input); err != nil {
+					r.log.Println(err)
+				}
+			}
+			r.text = false
 			r.input = make([]rune, 0)
-			r.inputCB = func(input []rune) error {
-				tags := commaSep(string(input))
-				if len(tags) == 0 {
-					return nil
-				}
-				r.updateMeta(file, func(m *meta.Meta) (bool, error) {
-					m.Tags = append(m.Tags, tags...)
-					r.addCompletion(tags...)
-					return true, nil
-				})
-				return nil
+			help(r.file())
+			r.nextIfAuto()
+		case glfw.KeyEscape:
+			r.inputCB = nil
+			if r.text {
+				r.text = false
+			} else if r.tagging {
+				r.toggleTagging()
 			}
-			fmt.Print("add tag: ")
-			r.text = true
-
-		case glfw.KeyM:
-			r.updateMeta(file, func(m *meta.Meta) (bool, error) {
-				r.input = []rune(strings.Join(m.Tags, ","))
-				return false, nil
-			})
-			r.inputCB = func(input []rune) error {
-				tags := commaSep(string(input))
-				r.updateMeta(file, func(m *meta.Meta) (bool, error) {
-					m.Tags = tags
-					r.addCompletion(tags...)
-					return true, nil
-				})
-				return nil
-			}
-			fmt.Print("tags: ", string(r.input))
-			r.text = true
-
-		case glfw.KeyD:
-			var met meta.Meta
-			r.updateMeta(r.file(), func(m *meta.Meta) (bool, error) {
-				met = *m
-				return false, nil
-			})
-			r.input = make([]rune, 0)
-			for i, t := range met.Tags {
-				fmt.Printf("%2d) %s\n", i+1, t)
-			}
-			r.inputCB = func(input []rune) error {
-				strs := commaSep(string(input))
-				ints := make(map[int]struct{}, len(strs))
-				for i := range strs {
-					n, err := strconv.Atoi(strs[i])
-					if err != nil {
-						return errors.New("invalid input")
-					}
-					ints[n-1] = struct{}{}
-				}
-
-				r.updateMeta(file, func(m *meta.Meta) (bool, error) {
-					tags := make(meta.Tags, 0, len(m.Tags))
-					for i := range m.Tags {
-						if _, ok := ints[i]; !ok {
-							tags = append(tags, m.Tags[i])
-						}
-					}
-					m.Tags = tags
-					r.addCompletion(tags...)
-					return true, nil
-				})
-				return nil
-			}
-			fmt.Print("delete tag: ")
-			r.text = true
-
 		}
 		return
+	}
+
+	if action != glfw.Release {
+		return
+	}
+
+	file := r.file()
+	help(file)
+	switch key {
+	case glfw.KeyQ, glfw.KeyEscape:
+		r.toggleTagging()
+
+	case glfw.KeyC:
+		var last meta.Tags
+		if r.index == 0 {
+			return
+		}
+		r.updateMeta(r.getFile(r.index-1), func(m *meta.Meta) (bool, error) {
+			last = m.Tags
+			return false, nil
+		})
+		r.updateMeta(file, func(m *meta.Meta) (bool, error) {
+			for _, t := range last {
+				m.Tags = append(m.Tags, t)
+				r.addCompletion(t)
+			}
+			return true, nil
+		})
+		help(file)
+
+	case glfw.KeyA:
+		r.input = make([]rune, 0)
+		r.inputCB = func(input []rune) error {
+			tags := commaSep(string(input))
+			if len(tags) == 0 {
+				return nil
+			}
+			r.updateMeta(file, func(m *meta.Meta) (bool, error) {
+				m.Tags = append(m.Tags, tags...)
+				r.addCompletion(tags...)
+				return true, nil
+			})
+			return nil
+		}
+		fmt.Print("add tag: ")
+		r.text = true
+
+	case glfw.KeyM:
+		r.updateMeta(file, func(m *meta.Meta) (bool, error) {
+			r.input = []rune(strings.Join(m.Tags, ","))
+			return false, nil
+		})
+		r.inputCB = func(input []rune) error {
+			tags := commaSep(string(input))
+			r.updateMeta(file, func(m *meta.Meta) (bool, error) {
+				m.Tags = tags
+				r.addCompletion(tags...)
+				return true, nil
+			})
+			return nil
+		}
+		fmt.Print("tags: ", string(r.input))
+		r.text = true
+
+	case glfw.KeyD:
+		var met meta.Meta
+		r.updateMeta(r.file(), func(m *meta.Meta) (bool, error) {
+			met = *m
+			return false, nil
+		})
+		r.input = make([]rune, 0)
+		for i, t := range met.Tags {
+			fmt.Printf("%2d) %s\n", i+1, t)
+		}
+		r.inputCB = func(input []rune) error {
+			strs := commaSep(string(input))
+			ints := make(map[int]struct{}, len(strs))
+			for i := range strs {
+				n, err := strconv.Atoi(strs[i])
+				if err != nil {
+					return errors.New("invalid input")
+				}
+				ints[n-1] = struct{}{}
+			}
+
+			r.updateMeta(file, func(m *meta.Meta) (bool, error) {
+				tags := make(meta.Tags, 0, len(m.Tags))
+				for i := range m.Tags {
+					if _, ok := ints[i]; !ok {
+						tags = append(tags, m.Tags[i])
+					}
+				}
+				m.Tags = tags
+				r.addCompletion(tags...)
+				return true, nil
+			})
+			return nil
+		}
+		fmt.Print("delete tag: ")
+		r.text = true
+	}
+}
+
+func (r *Rater) onKeyEditing(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	if len(r.editingList) == 1 {
+		r.edit(r.editingList[0])
+		return
+	}
+
+	r.clear()
+	r.print(r.file())
+	for i, f := range r.editingList {
+		fmt.Printf("%-2d) %s\n", i+1, f)
+	}
+	fmt.Printf("%s%s Choice: %s ", r.term.clrBlue, r.term.clrBlueContrast, r.term.none)
+	i, _ := strconv.Atoi(string(r.editingChoice))
+	if i > len(r.editingList) {
+		i = 0
+		r.editingChoice = r.editingChoice[:0]
+	}
+
+	if i != 0 {
+		fmt.Printf("%-2d\n", i)
 	}
 
 	if action == glfw.Release {
 		return
 	}
 
+	switch key {
+	case glfw.KeyQ:
+		r.editingList = nil
+		r.main()
+		return
+	case glfw.KeyEnter:
+		if i != 0 {
+			r.edit(r.editingList[i-1])
+			return
+		}
+	}
+
+	m := map[glfw.Key]rune{
+		glfw.Key0: '0',
+		glfw.Key1: '1',
+		glfw.Key2: '2',
+		glfw.Key3: '3',
+		glfw.Key4: '4',
+		glfw.Key5: '5',
+		glfw.Key6: '6',
+		glfw.Key7: '7',
+		glfw.Key8: '8',
+		glfw.Key9: '9',
+	}
+
+	n := m[key]
+	if n == 0 {
+		return
+	}
+	if n == '0' && len(r.editingChoice) == 0 {
+		return
+	}
+
+	r.editingChoice = append(r.editingChoice, n)
+}
+
+func (r *Rater) edit(file string) {
+	r.editingList = r.editingList[:0]
+	r.window.Hide()
+	r.clear()
+	defer func() {
+		r.window.MakeContextCurrent()
+		r.window.Show()
+		r.main()
+	}()
+	conf := phodo.NewConf(os.Stderr, nil)
+	if err := phodo.Editor(context.Background(), conf, file); err != nil {
+		r.fatal(err)
+	}
+}
+
+func (r *Rater) onKeyMain(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 	li := r.index
 	upd := update{-1, -1}
 	var changed bool
@@ -436,6 +529,28 @@ q | esc      : cancel
 	case glfw.KeyRight, glfw.KeySpace:
 		r.addIndex(1)
 
+	case glfw.KeyE:
+		f := r.file()
+		doprint = true
+		fmt.Printf(
+			"\n%s%s assembling files %s\n",
+			r.term.clrBlue,
+			r.term.clrBlueContrast,
+			r.term.none,
+		)
+		l, _ := r.compl.imp.FindLinks(f)
+		if len(l) == 0 {
+			doprint = false
+			fmt.Printf(
+				"\n%s%s no files available for editing %s\n",
+				r.term.clrRed,
+				r.term.clrRedContrast,
+				r.term.none,
+			)
+			break
+		}
+
+		r.editingList = l
 	case glfw.KeyA:
 		r.auto = !r.auto
 		enabled := "enabled"
@@ -488,9 +603,7 @@ q | esc      : cancel
 	}
 
 	if changed || doprint {
-		r.clear()
-		r.print(r.file())
-		r.usage()
+		r.main()
 	}
 }
 
@@ -554,6 +667,7 @@ f            : toggle fullscreen
 z            : toggle zoom
 
 a            : toggle automatically go to next image after deleting or rating
+e            : edit the current image with phodo
 p            : print filename and meta
 
 d | delete   : delete
@@ -656,10 +770,11 @@ func (r *Rater) Run() error {
 	}
 	var err error
 	r.window, err = initialize()
-	defer glfw.Terminate()
 	if err != nil {
 		return err
 	}
+	defer glfw.Terminate()
+	defer r.window.Destroy()
 	r.monitor = glfw.GetPrimaryMonitor()
 	r.videoMode = r.monitor.GetVideoMode()
 	r.windowX, r.windowY = r.window.GetPos()
