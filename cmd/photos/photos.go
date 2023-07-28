@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
@@ -20,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/frizinak/phodo/phodo"
 	"github.com/frizinak/photos/cmd/cli"
 	"github.com/frizinak/photos/cmd/flags"
 	"github.com/frizinak/photos/gphotos"
@@ -235,6 +237,26 @@ func main() {
 		}
 	}
 
+	var editor func(file string) error
+	{
+		var editorConf phodo.Conf
+		editorInit := false
+		editor = func(file string) error {
+			if !editorInit {
+				editorConf = phodo.NewConf(os.Stderr, nil)
+				editorInit = true
+			}
+			editorConf.EditorString = flag.Editor()
+			editorConf.Verbose = flag.Verbose()
+			var err error
+			editorConf, err = editorConf.Parse()
+			if err != nil {
+				return err
+			}
+			return phodo.Editor(context.Background(), editorConf, file)
+		}
+	}
+
 	work := _work(true)
 	workNoProgress := _work(false)
 
@@ -424,7 +446,7 @@ func main() {
 		},
 		flags.ActionPreviews: func() {
 			l.Println("creating previews")
-			work(2, func(f *importer.File) (workCB, error) {
+			work(-1, func(f *importer.File) (workCB, error) {
 				ex, can := imp.HasPreview(f)
 				if ex {
 					return nil, nil
@@ -451,9 +473,20 @@ func main() {
 				return
 			}
 
-			rater, err := rate.New(l, list, imp, flag.Editor())
+			rater, err := rate.New(l, list, imp, editor)
 			flag.Exit(err)
 			flag.Exit(rater.Run())
+		},
+		flags.ActionEdit: func() {
+			list := allMeta()
+			sort.Sort(list)
+			for _, f := range list {
+				links, err := imp.FindLinks(f.f)
+				flag.Exit(err)
+				for _, l := range links {
+					flag.Exit(editor(l))
+				}
+			}
 		},
 		flags.ActionSyncMeta: func() {
 			l.Println("syncing meta")

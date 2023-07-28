@@ -4,7 +4,6 @@
 package rate
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"image"
@@ -17,7 +16,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/frizinak/phodo/phodo"
 	"github.com/frizinak/photos/importer"
 	"github.com/frizinak/photos/meta"
 	"github.com/go-gl/gl/v4.6-core/gl"
@@ -92,7 +90,7 @@ type Rater struct {
 	tagging       bool
 	editingList   []string
 	editingChoice []rune
-	editingEditor string
+	editor        func(file string) error
 	text          bool
 	inputCB       func([]rune) error
 	input         []rune
@@ -126,8 +124,8 @@ type Rater struct {
 	log   *log.Logger
 }
 
-func New(log *log.Logger, files []*importer.File, imp *importer.Importer, editor string) (*Rater, error) {
-	r := &Rater{files: files, log: log, editingEditor: editor}
+func New(log *log.Logger, files []*importer.File, imp *importer.Importer, editor func(file string) error) (*Rater, error) {
+	r := &Rater{files: files, log: log, editor: editor}
 	r.compl.imp = imp
 
 	r.term.clrRed = "\033[48;5;124m"
@@ -501,9 +499,8 @@ func (r *Rater) edit(file string) {
 		r.window.Show()
 		r.main()
 	}()
-	conf := phodo.NewConf(os.Stderr, nil)
-	conf.EditorString = r.editingEditor
-	if err := phodo.Editor(context.Background(), conf, file); err != nil {
+
+	if err := r.editor(file); err != nil {
 		r.fatal(err)
 	}
 }

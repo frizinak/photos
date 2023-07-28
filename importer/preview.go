@@ -2,6 +2,7 @@ package importer
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"image"
@@ -10,9 +11,12 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/frizinak/phodo/pipeline"
+	"github.com/frizinak/phodo/pipeline/element"
 	"github.com/frizinak/photos/imagemagick"
 	"github.com/frizinak/photos/pp3"
 	"github.com/frizinak/photos/tags"
@@ -54,6 +58,69 @@ func RegisterPreviewGen(p PreviewGen) {
 	pgens = append(pgens, p)
 }
 
+type phoPreviewGen struct{}
+
+func (pho *phoPreviewGen) Name() string { return "Phodo" }
+func (pho *phoPreviewGen) Supports(f *File) bool {
+	return f.TypeRAW() || f.TypeImage()
+}
+
+func (pho *phoPreviewGen) Make(i *Importer, f *File, output string) error {
+	pl := `
+.preview(
+	resize-fit(1920 1920)
+	orientation()
+
+	exif-allow()
+
+	extend(310 0 0 0)
+	compose(
+		pos(0 0 (
+			histogram(rgb "width-10" 300 2)
+			extend(5)
+			border(2 hex(fff))
+		))
+	)
+)
+`
+	// pl := pipeline.New(
+	// 	element.Resize(1920, 1920, "", core.ResizeMax|core.ResizeNoUpscale),
+	// 	element.CorrectOrientation(),
+	// 	element.ExifAllow([]uint16{}),
+	// 	element.Extend(210, 0, 0, 0),
+	// 	element.Compose(
+	// 		element.NewPos(0, 0, pipeline.New(
+	// 			element.Histogram().RGBImage().BarSize(2).Size(500, 200),
+	// 			element.Extend(5, 5, 5, 5),
+	// 			element.Border(2, element.RGB8(0xff, 0xff, 0xff)),
+	// 		)),
+	// 	),
+	// )
+	dec := pipeline.NewDecoder(strings.NewReader(pl), nil)
+	r, err := dec.Decode(nil)
+	if err != nil {
+		return err
+	}
+	p, ok := r.Get(".preview")
+	if !ok {
+		return errors.New("[BUG] no preview pipeline found")
+	}
+
+	tmp := output + ".tmp"
+	line := pipeline.New()
+	line.Add(element.LoadFile(f.Path()))
+	line.Add(p.Element)
+	line.Add(element.SaveFile(tmp, ".jpg", 75))
+	rctx := pipeline.NewContext(false, pipeline.ModeConvert, context.Background())
+	_, err = line.Do(rctx, nil)
+	if err != nil {
+		os.Remove(tmp)
+		return err
+	}
+
+	return os.Rename(tmp, output)
+}
+
 type rtPreviewGen struct {
 }
 
@@ -69,8 +136,7 @@ func (rt *rtPreviewGen) Make(i *Importer, f *File, output string) error {
 	if err != nil {
 		return err
 	}
-	pp.ResizeLongest(1920)
-	if err := i.convert(f.Path(), tmp, pp, time.Time{}, nil, nil); err != nil {
+	if err := i.convertPP3(f.Path(), tmp, pp, 1920, time.Time{}, nil, nil); err != nil {
 		return err
 	}
 
@@ -246,6 +312,7 @@ func (vid *vidPreviewGen) Make(i *Importer, f *File, output string) error {
 }
 
 func init() {
+	RegisterPreviewGen(&phoPreviewGen{})
 	RegisterPreviewGen(&rtPreviewGen{})
 	RegisterPreviewGen(&imPreviewGen{})
 	RegisterPreviewGen(&vidPreviewGen{})

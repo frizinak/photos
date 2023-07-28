@@ -10,10 +10,10 @@ import (
 	"github.com/frizinak/photos/pp3"
 )
 
-func (i *Importer) GetPP3(link string) (*pp3.PP3, string, error) {
+func (i *Importer) GetPP3(link string) (*pp3.PP3, error) {
 	pp3Path := fmt.Sprintf("%s.pp3", link)
 	pp3, err := pp3.Load(pp3Path)
-	return pp3, pp3Path, err
+	return pp3, err
 }
 
 func (i *Importer) PP3ToMeta(link string) error {
@@ -27,7 +27,7 @@ func (i *Importer) PP3ToMeta(link string) error {
 		return err
 	}
 
-	pp, _, err := i.GetPP3(link)
+	pp, err := i.GetPP3(link)
 	if err != nil {
 		return err
 	}
@@ -50,12 +50,12 @@ func (i *Importer) MetaToPP3(link string) error {
 		return err
 	}
 
-	pp, pp3Path, err := i.GetPP3(link)
+	pp, err := i.GetPP3(link)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
-		pp, err = pp3.New(pp3Path)
+		pp, err = pp3.New(pp.Path())
 		if err != nil {
 			return err
 		}

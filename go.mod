@@ -8,7 +8,7 @@ require (
 	github.com/dsoprea/go-exif/v3 v3.0.0-20210625224831-a6301f85c82b
 	github.com/dsoprea/go-jpeg-image-structure/v2 v2.0.0-20210512043942-b434301c6836
 	github.com/frizinak/gphoto2go v0.0.0-20200727103018-6698a73f379d
-	github.com/frizinak/phodo v0.0.0-20230727123106-3e5fff76c34e // indirect
+	github.com/frizinak/phodo v0.0.0-20230728130302-8c2a06f4cdec
 	github.com/go-gl/gl v0.0.0-20211210172815-726fda9656d6
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20221017161538-93cebf72946b
 	github.com/go-gl/mathgl v1.0.0

@@ -2,7 +2,12 @@ package importer
 
 import (
 	"bytes"
+	"context"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"hash/crc64"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,12 +15,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/frizinak/phodo/pipeline"
+	"github.com/frizinak/phodo/pipeline/element"
 	"github.com/frizinak/photos/meta"
 	"github.com/frizinak/photos/pp3"
 	"github.com/frizinak/photos/tags"
 )
 
-func (i *Importer) convert(input, output string, pp *pp3.PP3, created time.Time, lat, lng *float64) error {
+type sidecar interface {
+	Path() string
+	Hash(w io.Writer)
+}
+
+func (i *Importer) convertPP3(input, output string, pp *pp3.PP3, size int, created time.Time, lat, lng *float64) error {
+	pp.ResizeLongest(size)
+
 	pp3TempPath := fmt.Sprintf("%s.tmp.pp3", output)
 	err := pp.SaveTo(pp3TempPath)
 	defer os.Remove(pp3TempPath)
@@ -65,6 +79,40 @@ func (i *Importer) convert(input, output string, pp *pp3.PP3, created time.Time,
 	return nil
 }
 
+func (i *Importer) convertPho(input, output string, pho Pho, size int, created time.Time, lat, lng *float64) error {
+	p, ok := pho.Convert()
+	if !ok {
+		return fmt.Errorf("no .convert pipeline in '%s'", pho.Path())
+	}
+
+	line := pipeline.New()
+	line.Add(element.LoadFile(input))
+	line.Add(p.Element)
+	line.Add(element.SaveFile(output, ".jpg", 92))
+
+	// TODO pass verbose flag
+	rctx := pipeline.NewContext(false, pipeline.ModeConvert, context.Background())
+	_, err := line.Do(rctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// TODO we can do this cleaner.
+	if err := i.FixJPEGTZ(output, created); err != nil {
+		os.Remove(output)
+		return err
+	}
+
+	if lat != nil && lng != nil {
+		if err := i.jpegGPS(output, created, *lat, *lng); err != nil {
+			os.Remove(output)
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (i *Importer) JPEGGPS(conv string, created time.Time, lat, lng float64) error {
 	return i.jpegGPS(filepath.Join(i.convDir, conv), created, lat, lng)
 }
@@ -102,14 +150,17 @@ func (i *Importer) convertIfUpdated(
 	link,
 	dir,
 	output string,
-	pp *pp3.PP3,
+	sidecar sidecar,
 	converted map[string]meta.Converted,
 	size int,
 	created time.Time,
 	checkOnly bool,
 ) (bool, string, error) {
-	pp.ResizeLongest(size)
-	hash := pp.Hash()
+	h := crc64.New(crc64.MakeTable(crc64.ISO))
+	fmt.Fprintf(h, "%d\n", size)
+	sidecar.Hash(h)
+	hash := hex.EncodeToString(h.Sum(nil))
+
 	output = fmt.Sprintf("%s.jpg", output)
 	rel, err := filepath.Rel(dir, output)
 	if err != nil {
@@ -137,29 +188,49 @@ func (i *Importer) convertIfUpdated(
 	if loc != nil {
 		lat, lng = &loc.Lat, &loc.Lng
 	}
-	return true, rel, i.convert(link, output, pp, created, lat, lng)
+
+	switch sc := sidecar.(type) {
+	case *pp3.PP3:
+		return true, rel, i.convertPP3(link, output, sc, size, created, lat, lng)
+	case Pho:
+		return true, rel, i.convertPho(link, output, sc, size, created, lat, lng)
+	}
+	return false, rel, fmt.Errorf("unsupported sidecar file of type %T", sidecar)
 }
 
 func (i *Importer) Unedited(f *File) (bool, error) {
-	edited := true
+	pp3edited := true
+	phoedited := true
 	err := i.walkLinks(f, func(link string) (bool, error) {
-		pp3, _, err := i.GetPP3(link)
+		pho, err := i.GetPho(link)
+		if err != nil && errors.Is(err, os.ErrNotExist) {
+			err = nil
+			phoedited = false
+		}
 		if err != nil {
-			if os.IsNotExist(err) {
-				edited = false
-				return false, nil
-			}
 			return false, err
 		}
-		if !pp3Edited(pp3) {
-			edited = false
+		phoedited = phoedited && pho.Edited()
+
+		pp3, err := i.GetPP3(link)
+		if err != nil && errors.Is(err, os.ErrNotExist) {
+			err = nil
+			pp3edited = false
+		}
+		if err != nil {
+			return false, err
+		}
+
+		pp3edited = pp3edited && pp3 != nil && pp3Edited(pp3)
+
+		if !pp3edited && !phoedited {
 			return false, nil
 		}
 
 		return true, nil
 	})
 
-	return !edited, err
+	return !pp3edited && !phoedited, err
 }
 
 func pp3Edited(pp *pp3.PP3) bool {
@@ -177,19 +248,28 @@ func (i *Importer) Convert(f *File, sizes []int) error {
 
 func (i *Importer) fileConvert(f *File, sizes []int, checkOnly bool) (bool, error) {
 	links := []string{}
-	pp3s := []*pp3.PP3{}
+	sidecars := []sidecar{}
 	err := i.walkLinks(f, func(link string) (bool, error) {
-		pp3, _, err := i.GetPP3(link)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return true, nil
-			}
+		pho, err := i.GetPho(link)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return false, err
 		}
+		if err == nil {
+			sidecars = append(sidecars, pho)
+			links = append(links, link)
+			return true, nil
+		}
 
-		pp3s = append(pp3s, pp3)
-		links = append(links, link)
-		return true, err
+		pp3, err := i.GetPP3(link)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return false, err
+		}
+		if err == nil {
+			sidecars = append(sidecars, pp3)
+			links = append(links, link)
+		}
+
+		return true, nil
 	})
 	if err != nil {
 		return false, err
@@ -227,7 +307,7 @@ func (i *Importer) fileConvert(f *File, sizes []int, checkOnly bool) (bool, erro
 				links[n],
 				i.convDir,
 				output,
-				pp3s[n],
+				sidecars[n],
 				conv,
 				s,
 				m.CreatedTime(),

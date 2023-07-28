@@ -1,8 +1,6 @@
 package pp3
 
 import (
-	"crypto/sha512"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -68,6 +66,8 @@ func load(path string, opts ini.LoadOptions) (*PP3, error) {
 func (pp *PP3) Save() error {
 	return pp.SaveTo(pp.path)
 }
+
+func (pp *PP3) Path() string { return pp.path }
 
 func (pp *PP3) SaveTo(path string) error {
 	tmp := path + ".tmp"
@@ -161,7 +161,7 @@ outer:
 	return l
 }
 
-func (pp *PP3) Hash() string {
+func (pp *PP3) Hash(w io.Writer) {
 	d := make([]string, 0)
 	for _, s := range pp.ini.Sections() {
 		pp.strings(s, &d)
@@ -169,9 +169,11 @@ func (pp *PP3) Hash() string {
 
 	d = pp.filter(d)
 	sort.Strings(d)
-	str := strings.Join(d, "\n")
-	sum := sha512.Sum512([]byte(str))
-	return hex.EncodeToString(sum[:])
+	nl := []byte{'\n'}
+	for _, v := range d {
+		w.Write([]byte(v))
+		w.Write(nl)
+	}
 }
 
 func (pp *PP3) Trashed() bool {

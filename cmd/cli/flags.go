@@ -143,6 +143,9 @@ var lists = Lists{
 			flags.ActionRate: {
 				"Simple opengl window to rate / trash images (filter with -filter)",
 			},
+			flags.ActionEdit: {
+				"Run the phodo editor for each image.",
+			},
 			flags.ActionSyncMeta: {
 				"Sync .meta file with .pp3 (file mtime determines which one is the authority) and filesystem",
 			},
