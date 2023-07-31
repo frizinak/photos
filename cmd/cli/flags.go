@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/frizinak/phodo/phodo"
 	"github.com/frizinak/photos/cmd/flags"
 	"github.com/frizinak/photos/importer"
 	"github.com/frizinak/photos/meta"
@@ -369,6 +370,8 @@ type Flags struct {
 	gphotos   string
 	glocation string
 
+	phodoConf *phodo.Conf
+
 	log    *log.Logger
 	output func(string)
 
@@ -420,7 +423,19 @@ func (f *Flags) RatingLT() int { return f.rating.lt }
 
 func (f *Flags) Verbose() bool { return f.verbose }
 
-func (f *Flags) Editor() string { return f.editor }
+func (f *Flags) PhodoConf() phodo.Conf {
+	if f.phodoConf != nil {
+		return *f.phodoConf
+	}
+	conf := phodo.NewConf(os.Stderr, nil)
+	conf.EditorString = f.editor
+	conf.Verbose = f.Verbose()
+	conf, _ = conf.Parse()
+
+	f.phodoConf = &conf
+
+	return conf
+}
 
 func (f *Flags) GPhotosCredentials() string { return f.gphotos }
 func (f *Flags) GLocationDirectory() string { return f.glocation }

@@ -2,7 +2,6 @@ package importer
 
 import (
 	"io"
-	"os"
 
 	"github.com/frizinak/phodo/phodo"
 	"github.com/frizinak/phodo/pipeline"
@@ -25,19 +24,18 @@ func (p Pho) Convert() (pipeline.NamedElement, bool) {
 	return p.root.Get(PhoConvertTarget)
 }
 
-func (p Pho) Path() string { return p.path }
-
-func (p Pho) Hash(w io.Writer) {
-	w.Write(p.hash)
-}
+func (p Pho) Path() string     { return p.path }
+func (p Pho) Hash(w io.Writer) { w.Write(p.hash) }
 
 func (i *Importer) GetPho(link string) (Pho, error) {
-	// TODO pass conf / verbose flag
 	var pho Pho
-	c := phodo.NewConf(os.Stderr, nil)
-	root, err := phodo.LoadSidecar(c, link)
+	root, err := phodo.LoadSidecar(i.phodoConf, link)
+	if err != nil {
+		return pho, err
+	}
+
 	pho.root = root
-	pho.path = c.Script
+	pho.path, err = phodo.SidecarPath(i.phodoConf, link)
 	if err != nil {
 		return pho, err
 	}

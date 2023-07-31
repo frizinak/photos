@@ -132,7 +132,9 @@ func (rt *rtPreviewGen) Available() bool { return execAvailable("rawtherapee-cli
 
 func (rt *rtPreviewGen) Make(i *Importer, f *File, output string) error {
 	tmp := output + ".tmp"
-	pp, err := pp3.New(tmp + ".pp3")
+	var pp PP3
+	var err error
+	pp.PP3, err = pp3.New(tmp + ".pp3")
 	if err != nil {
 		return err
 	}

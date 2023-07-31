@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtime/pprof"
 	"sort"
 	"strings"
 	"sync"
@@ -76,10 +77,21 @@ func ask() string {
 }
 
 func main() {
+	pproffile, _ := os.Create("/tmp/pprof.tmp")
+	pprof.StartCPUProfile(pproffile)
+	defer pprof.StopCPUProfile()
+
 	l := log.New(os.Stderr, "", log.LstdFlags)
 	flag := cli.NewFlags()
 	flag.Parse()
-	imp := importer.New(l, flag.Log(), flag.RawDir(), flag.CollectionDir(), flag.JPEGDir())
+	imp := importer.New(
+		l,
+		flag.Log(),
+		flag.PhodoConf(),
+		flag.RawDir(),
+		flag.CollectionDir(),
+		flag.JPEGDir(),
+	)
 
 	var filter func(f *importer.File) bool
 	all := func(it func(f *importer.File) (bool, error)) {
@@ -237,24 +249,8 @@ func main() {
 		}
 	}
 
-	var editor func(file string) error
-	{
-		var editorConf phodo.Conf
-		editorInit := false
-		editor = func(file string) error {
-			if !editorInit {
-				editorConf = phodo.NewConf(os.Stderr, nil)
-				editorInit = true
-			}
-			editorConf.EditorString = flag.Editor()
-			editorConf.Verbose = flag.Verbose()
-			var err error
-			editorConf, err = editorConf.Parse()
-			if err != nil {
-				return err
-			}
-			return phodo.Editor(context.Background(), editorConf, file)
-		}
+	editor := func(file string) error {
+		return phodo.Editor(context.Background(), flag.PhodoConf(), file)
 	}
 
 	work := _work(true)
@@ -513,7 +509,7 @@ func main() {
 				return func() error {
 					for p := range m.Conv {
 						p = filepath.Join(flag.JPEGDir(), p)
-						if err := imp.FixJPEGTZ(p, m.CreatedTime()); err != nil {
+						if err := imp.JPEGTZ(p, m.CreatedTime()); err != nil {
 							return err
 						}
 					}
@@ -830,8 +826,9 @@ Exposure: %s
 				}
 
 				return func() error {
-					for file := range m.Conv {
-						err := imp.JPEGGPS(file, c, ll.Lat, ll.Lng)
+					for p := range m.Conv {
+						p = filepath.Join(flag.JPEGDir(), p)
+						err := imp.JPEGGPS(p, c, ll.Lat, ll.Lng)
 						if err != nil {
 							return err
 						}

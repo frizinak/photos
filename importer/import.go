@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"sync"
+
+	"github.com/frizinak/phodo/phodo"
 )
 
 type Exists func(*File, io.ReadSeeker, int64) (bool, error)
@@ -57,16 +59,19 @@ type Importer struct {
 	colDir  string
 	convDir string
 
+	phodoConf phodo.Conf
+
 	symlinkSem        sync.RWMutex
 	symlinkCache      map[string][]LinkInfo
 	symlinkCachePaths map[string]map[string]struct{}
 }
 
-func New(log, verbose *log.Logger, rawDir, colDir, convDir string) *Importer {
+func New(log, verbose *log.Logger, conf phodo.Conf, rawDir, colDir, convDir string) *Importer {
 	i := &Importer{
 		log:     log,
 		verbose: verbose,
 		rawDir:  rawDir, colDir: colDir, convDir: convDir,
+		phodoConf: conf,
 	}
 	i.ClearCache()
 	return i

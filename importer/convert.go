@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"hash/crc64"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,19 +16,22 @@ import (
 	"strings"
 	"time"
 
+	"github.com/frizinak/phodo/exif"
+	"github.com/frizinak/phodo/img48"
+	"github.com/frizinak/phodo/jpeg"
 	"github.com/frizinak/phodo/pipeline"
 	"github.com/frizinak/phodo/pipeline/element"
+	"github.com/frizinak/phodo/pipeline/element/core"
 	"github.com/frizinak/photos/meta"
-	"github.com/frizinak/photos/pp3"
-	"github.com/frizinak/photos/tags"
 )
 
 type sidecar interface {
 	Path() string
 	Hash(w io.Writer)
+	Edited() bool
 }
 
-func (i *Importer) convertPP3(input, output string, pp *pp3.PP3, size int, created time.Time, lat, lng *float64) error {
+func (i *Importer) convertPP3(input, output string, pp PP3, size int, created time.Time, lat, lng *float64) error {
 	pp.ResizeLongest(size)
 
 	pp3TempPath := fmt.Sprintf("%s.tmp.pp3", output)
@@ -60,16 +64,13 @@ func (i *Importer) convertPP3(input, output string, pp *pp3.PP3, size int, creat
 		return fmt.Errorf("%s: %s", err, buf)
 	}
 
-	if err := i.FixJPEGTZ(tmp, created); err != nil {
+	err = i.jpegRewrite(tmp, func(e *exif.Exif) (bool, error) {
+		return i.Exif(e, created, lat, lng)
+	})
+
+	if err != nil {
 		os.Remove(tmp)
 		return err
-	}
-
-	if lat != nil && lng != nil {
-		if err := i.jpegGPS(tmp, created, *lat, *lng); err != nil {
-			os.Remove(tmp)
-			return err
-		}
 	}
 
 	if tmp != output {
@@ -85,64 +86,206 @@ func (i *Importer) convertPho(input, output string, pho Pho, size int, created t
 		return fmt.Errorf("no .convert pipeline in '%s'", pho.Path())
 	}
 
-	line := pipeline.New()
-	line.Add(element.LoadFile(input))
-	line.Add(p.Element)
-	line.Add(element.SaveFile(output, ".jpg", 92))
+	// TODO perhaps pass size variable
+	line := pipeline.New().
+		Add(element.LoadFile(input)).
+		Add(p.Element).
+		Add(pipeline.ElementFunc(func(ctx pipeline.Context, img *img48.Img) (*img48.Img, error) {
+			_, err := i.Exif(img.Exif, created, lat, lng)
+			return img, err
+		})).
+		Add(element.Resize(size, size, "", core.ResizeMax|core.ResizeNoUpscale)).
+		Add(element.SaveFile(output, ".jpg", 92))
 
-	// TODO pass verbose flag
-	rctx := pipeline.NewContext(false, pipeline.ModeConvert, context.Background())
+	rctx := pipeline.NewContext(i.phodoConf.Verbose, pipeline.ModeConvert, context.Background())
 	_, err := line.Do(rctx, nil)
-	if err != nil {
-		return err
-	}
+	return err
+}
 
-	// TODO we can do this cleaner.
-	if err := i.FixJPEGTZ(output, created); err != nil {
-		os.Remove(output)
-		return err
+func (i *Importer) Exif(e *exif.Exif, created time.Time, lat, lng *float64) (bool, error) {
+	write := false
+
+	w, err := i.ExifTZ(e, created)
+	write = write || w
+	if err != nil {
+		return write, err
 	}
 
 	if lat != nil && lng != nil {
-		if err := i.jpegGPS(output, created, *lat, *lng); err != nil {
-			os.Remove(output)
-			return err
+		w, err = i.ExifGPS(e, created, *lat, *lng)
+		write = write || w
+	}
+
+	return write, err
+}
+
+func (i *Importer) ExifTZ(e *exif.Exif, created time.Time) (bool, error) {
+	write := false
+	tzParse := func(dt string) (string, error) {
+		tm, err := time.Parse("2006:01:02 15:04:05", dt)
+		if err != nil {
+			return "", err
 		}
+
+		s := tm.Sub(created)
+		if s > time.Hour*24 || s < -time.Hour*24 {
+			return "", errors.New("impossible timezone correction")
+		}
+
+		min := s.Minutes()
+		sgn := "+"
+		if min < 0 {
+			sgn = "-"
+			min = -min
+		}
+		h := int(min / 60)
+		m := int(min - float64(h*60))
+		return fmt.Sprintf("%s%02d:%02d", sgn, h, m), nil
 	}
 
-	return nil
-}
+	tzFix := func(dt []uint16, set func(value string)) error {
+		timeEntry := e.Find(dt...)
+		if timeEntry == nil {
+			return nil
+		}
+		if v, ok := timeEntry.Value().Value.(string); ok {
+			tzValue, err := tzParse(v)
+			if err != nil {
+				return err
+			}
 
-func (i *Importer) JPEGGPS(conv string, created time.Time, lat, lng float64) error {
-	return i.jpegGPS(filepath.Join(i.convDir, conv), created, lat, lng)
-}
+			set(tzValue)
+		}
 
-func (i *Importer) jpegGPS(file string, created time.Time, lat, lng float64) error {
-	tmp := file + ".tmp.gps"
-	out, _ := os.Create(tmp)
-	err := tags.EditJPEGExif(file, out, tags.JPEGExifGPS(created, lat, lng))
-	out.Close()
-	if err != nil {
-		os.Remove(tmp)
-		return err
-	}
-	return os.Rename(tmp, file)
-}
-
-func (i *Importer) FixJPEGTZ(file string, t time.Time) error {
-	if t == (time.Time{}) {
 		return nil
 	}
 
-	tmp := file + ".tmp.fixup"
-	out, _ := os.Create(tmp)
-	err := tags.EditJPEGExif(file, out, tags.JPEGExifTZ(t, false))
-	out.Close()
+	err := tzFix([]uint16{0x8769, 0x9003}, func(v string) {
+		write = true
+		e.Ensure(0, 0x8769, exif.TypeUint32).IFDSet.
+			Ensure(0, 0x9011, exif.TypeASCII).
+			SetString(v)
+	})
+	if err != nil {
+		return write, err
+	}
+
+	err = tzFix([]uint16{0x0132}, func(v string) {
+		write = true
+		e.Ensure(0, 0x8769, exif.TypeUint32).IFDSet.
+			Ensure(0, 0x9010, exif.TypeASCII).
+			SetString(v)
+	})
+	if err != nil {
+		return write, err
+	}
+
+	return write, nil
+}
+
+func (i *Importer) ExifGPS(e *exif.Exif, created time.Time, lat, lng float64) (bool, error) {
+	hms := func(v float64) (h, m, s float64) {
+		h = float64(int(v))
+		m = float64(int((v - h) * 60))
+		s = (v - h - m/60) * 3600
+		return
+	}
+
+	hms24 := func(values []float64, denoms []int) [][2]int {
+		if len(values) != len(denoms) {
+			panic("every value should match one denom")
+		}
+
+		val := make([][2]int, len(values))
+		for i := range values {
+			val[i][0] = int(values[i] * float64(denoms[i]))
+			val[i][1] = denoms[i]
+		}
+		return val
+	}
+
+	coords := func(v float64) [][2]int {
+		valh, valm, vals := hms(v)
+		return hms24([]float64{valh, valm, vals}, []int{1, 1, 10000})
+	}
+
+	gps := e.Ensure(0, 0x8825, exif.TypeUint32)
+	latref, lngref := "N", "E"
+	if lat < 0 {
+		latref = "S"
+	}
+	if lng < 0 {
+		lngref = "W"
+	}
+
+	latvalue := coords(math.Abs(lat))
+	lngvalue := coords(math.Abs(lng))
+
+	utc := created.UTC()
+	timevalue := hms24(
+		[]float64{float64(utc.Hour()), float64(utc.Minute()), float64(utc.Second())},
+		[]int{1, 1, 1},
+	)
+
+	gps.IFDSet.Ensure(0, 0x0001, exif.TypeASCII).SetString(latref)
+	gps.IFDSet.Ensure(0, 0x0002, exif.TypeUrational).SetRationals(latvalue)
+	gps.IFDSet.Ensure(0, 0x0003, exif.TypeASCII).SetString(lngref)
+	gps.IFDSet.Ensure(0, 0x0004, exif.TypeUrational).SetRationals(lngvalue)
+
+	gps.IFDSet.Ensure(0, 0x0007, exif.TypeUrational).SetRationals(timevalue)
+	gps.IFDSet.Ensure(0, 0x001d, exif.TypeASCII).SetString(utc.Format("2006:01:02"))
+
+	return true, nil
+}
+
+func (i *Importer) jpegRewrite(file string, rewrite func(*exif.Exif) (bool, error)) error {
+	f, err := os.Open(file)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	exif, err := exif.Read(f)
+	if err != nil {
+		return err
+	}
+
+	written, err := rewrite(exif)
+	if !written || err != nil {
+		return err
+	}
+
+	_, err = f.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
+	}
+
+	tmp := file + ".tmp"
+	w, err := os.Create(tmp)
+	if err != nil {
+		return err
+	}
+
+	err = jpeg.OverwriteExif(f, w, exif)
+	w.Close()
 	if err != nil {
 		os.Remove(tmp)
 		return err
 	}
+
 	return os.Rename(tmp, file)
+}
+
+func (i *Importer) JPEGGPS(file string, created time.Time, lat, lng float64) error {
+	return i.jpegRewrite(file, func(e *exif.Exif) (bool, error) {
+		return i.ExifGPS(e, created, lat, lng)
+	})
+}
+
+func (i *Importer) JPEGTZ(file string, t time.Time) error {
+	return i.jpegRewrite(file, func(e *exif.Exif) (bool, error) {
+		return i.ExifTZ(e, t)
+	})
 }
 
 func (i *Importer) convertIfUpdated(
@@ -190,7 +333,7 @@ func (i *Importer) convertIfUpdated(
 	}
 
 	switch sc := sidecar.(type) {
-	case *pp3.PP3:
+	case PP3:
 		return true, rel, i.convertPP3(link, output, sc, size, created, lat, lng)
 	case Pho:
 		return true, rel, i.convertPho(link, output, sc, size, created, lat, lng)
@@ -221,7 +364,7 @@ func (i *Importer) Unedited(f *File) (bool, error) {
 			return false, err
 		}
 
-		pp3edited = pp3edited && pp3 != nil && pp3Edited(pp3)
+		pp3edited = pp3edited && pp3.Edited()
 
 		if !pp3edited && !phoedited {
 			return false, nil
@@ -231,10 +374,6 @@ func (i *Importer) Unedited(f *File) (bool, error) {
 	})
 
 	return !pp3edited && !phoedited, err
-}
-
-func pp3Edited(pp *pp3.PP3) bool {
-	return pp.Has("Exposure", "Compensation")
 }
 
 func (i *Importer) CheckConvert(f *File, sizes []int) (bool, error) {
@@ -254,7 +393,7 @@ func (i *Importer) fileConvert(f *File, sizes []int, checkOnly bool) (bool, erro
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return false, err
 		}
-		if err == nil {
+		if err == nil && pho.Edited() {
 			sidecars = append(sidecars, pho)
 			links = append(links, link)
 			return true, nil

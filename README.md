@@ -7,7 +7,7 @@
 - libgphoto2          (`-action import`) if not compiled with `-tags gphoto2cli` (preferred)
 - gphoto2             (`-action import`) if compiled with `-tags gphoto2cli`
 - ffmpeg for .MOVs    (`-action import`, currently only uses ffprobe for metadata)
-- rawtherapee         (`-action convert`)
+- rawtherapee         (`-action convert` optional, if you dont use the [phodo](https://github.com/frizinak/phodo) edit workflow)
 
 ## What it does
 
@@ -16,9 +16,9 @@
 3. At this point you can:
     - rename and/or move any of those symlink (as long as the symlink stays intact and remains a descendant of `-collection`)
     - review em using the builtin rating application `-action rate`
-    - edit the raws in `-collection` with rawtherapee
+    - edit the raws in `-collection` with rawtherapee or `-action edit` / `-action rate`
 4. Ratings and deleted/trash flag will be synced between all symlinks of a given raw
-5. Convert images to jpegs using the rawtherapee.pp3 sidecar file and store em in `-jpegs` using the same directory hierarchy as the one we/you have created in `-collection`
+5. Convert images to jpegs using the rawtherapee.pp3 or phodo.pho sidecar file and store em in `-jpegs` using the same directory hierarchy as the one we/you have created in `-collection`
 
 ## Usage
 
@@ -57,7 +57,7 @@ which defaults to
 
 `photos -base my_library -action cleanup -gt 2`
 
-- Convert images with a rating > 2 and have been opened in rawtherapee (-edited) to jpegs
+- Convert images with a rating > 2 and have been opened in rawtherapee or a .convert() target in phodo sidecar file (-edited) to jpegs
 
 `photos -base my_library -action convert -sizes 3840,1920,800 -filter undeleted,edited -gt 2
 
@@ -67,10 +67,10 @@ which defaults to
 
 ## Install
 
-`go install github.com/frizinak/photos/cmd/photos@latest`
+`go install github.com/frizinak/photos/cmd/photos`
 
 ## Bash completion
 
-`go install github.com/frizinak/photos/cmd/photos_completion@latest`
+`go install github.com/frizinak/photos/cmd/photos_completion`
 
 `complete -C photos_completion -o default photos`
