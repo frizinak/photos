@@ -520,9 +520,9 @@ func (r *Rater) onKeyMain(w *glfw.Window, key glfw.Key, scancode int, action glf
 		r.toggleFS()
 	case glfw.KeyZ:
 		r.zoom = !r.zoom
-	case glfw.KeyLeft:
+	case glfw.KeyLeft, glfw.KeyLeftBracket:
 		r.addIndex(-1)
-	case glfw.KeyRight, glfw.KeySpace:
+	case glfw.KeyRight, glfw.KeyRightBracket, glfw.KeySpace:
 		r.addIndex(1)
 
 	case glfw.KeyE:
