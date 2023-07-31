@@ -892,7 +892,7 @@ func (f *Flags) Parse() {
 // .convert(.main())`))
 
 		f.Err(cnot(phodoPreview, `
-.preview(
+.main(
     resize-fit(1920 1920)
     orientation()
 
