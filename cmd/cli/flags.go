@@ -370,7 +370,8 @@ type Flags struct {
 	gphotos   string
 	glocation string
 
-	phodoConf *phodo.Conf
+	phodoConf    *phodo.Conf
+	phodoDefault string
 
 	log    *log.Logger
 	output func(string)
@@ -423,18 +424,31 @@ func (f *Flags) RatingLT() int { return f.rating.lt }
 
 func (f *Flags) Verbose() bool { return f.verbose }
 
-func (f *Flags) PhodoConf() phodo.Conf {
+func (f *Flags) PhodoConf() (phodo.Conf, error) {
 	if f.phodoConf != nil {
-		return *f.phodoConf
+		return *f.phodoConf, nil
 	}
 	conf := phodo.NewConf(os.Stderr, nil)
 	conf.EditorString = f.editor
 	conf.Verbose = f.Verbose()
-	conf, _ = conf.Parse()
+	var err error
+	conf, err = conf.Parse()
+	if err != nil {
+		return conf, err
+	}
+
+	c, err := ioutil.ReadFile(f.phodoDefault)
+	if err != nil {
+		return conf, err
+	}
+
+	conf.DefaultPipelines = func() string {
+		return string(c)
+	}
 
 	f.phodoConf = &conf
 
-	return conf
+	return conf, nil
 }
 
 func (f *Flags) GPhotosCredentials() string { return f.gphotos }
@@ -829,7 +843,6 @@ func (f *Flags) Parse() {
 		conffile := filepath.Join(confdir, "photos.conf")
 		fl, err := os.Open(conffile)
 		if os.IsNotExist(err) {
-			err = nil
 			os.MkdirAll(confdir, 0755)
 			fl, err = os.Create(conffile)
 			f.Err(err)
@@ -852,7 +865,56 @@ func (f *Flags) Parse() {
 		}
 
 		f.Err(s.Err())
+
+		f.phodoDefault = filepath.Join(confdir, "default.pho")
+		phodoPreview := filepath.Join(confdir, "preview.pho")
+		cnot := func(path string, def string) error {
+			_, err := os.Stat(path)
+			if !os.IsNotExist(err) {
+				return err
+			}
+			f, err := os.Create(path)
+			if err != nil {
+				return err
+			}
+
+			_, err = fmt.Fprint(f, def)
+			f.Close()
+			return err
+		}
+
+		f.Err(cnot(f.phodoDefault, `.main(
+    orientation()
+)
+
+// Uncomment the line below to mark the image edit as 'finished'
+// allowing the image to be converted.
+// .convert(.main())`))
+
+		f.Err(cnot(phodoPreview, `
+.preview(
+    resize-fit(1920 1920)
+    orientation()
+
+    exif-allow()
+
+    extend(310 0 0 0)
+    compose(
+        pos(0 0 (
+            histogram(rgb "width-10" 300 2)
+            extend(5)
+            border(2 hex(fff))
+        ))
+    )
+)
+`))
+
+		importer.RegisterPreviewGen(&importer.PhoPreviewGen{phodoPreview})
 	}
+
+	importer.RegisterPreviewGen(&importer.RTPreviewGen{})
+	importer.RegisterPreviewGen(&importer.IMPreviewGen{})
+	importer.RegisterPreviewGen(&importer.VidPreviewGen{})
 
 	if len(confArgs) != 0 {
 		f.Err(f.fs.Parse(confArgs))

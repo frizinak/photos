@@ -18,8 +18,7 @@ func init() {
 }
 
 type PP3 struct {
-	path string
-	ini  *ini.File
+	ini *ini.File
 }
 
 func Load(path string) (*PP3, error) {
@@ -58,16 +57,9 @@ func load(path string, opts ini.LoadOptions) (*PP3, error) {
 		return nil, err
 	}
 	return &PP3{
-		path,
 		ini,
 	}, nil
 }
-
-func (pp *PP3) Save() error {
-	return pp.SaveTo(pp.path)
-}
-
-func (pp *PP3) Path() string { return pp.path }
 
 func (pp *PP3) SaveTo(path string) error {
 	tmp := path + ".tmp"

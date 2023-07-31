@@ -77,17 +77,13 @@ func ask() string {
 }
 
 func main() {
-	pproffile, _ := os.Create("/tmp/pprof.tmp")
-	pprof.StartCPUProfile(pproffile)
-	defer pprof.StopCPUProfile()
-
 	l := log.New(os.Stderr, "", log.LstdFlags)
 	flag := cli.NewFlags()
 	flag.Parse()
 	imp := importer.New(
 		l,
 		flag.Log(),
-		flag.PhodoConf(),
+		flag.PhodoConf,
 		flag.RawDir(),
 		flag.CollectionDir(),
 		flag.JPEGDir(),
@@ -250,7 +246,11 @@ func main() {
 	}
 
 	editor := func(file string) error {
-		return phodo.Editor(context.Background(), flag.PhodoConf(), file)
+		c, err := flag.PhodoConf()
+		if err != nil {
+			return err
+		}
+		return phodo.Editor(context.Background(), c, file)
 	}
 
 	work := _work(true)

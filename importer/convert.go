@@ -86,6 +86,11 @@ func (i *Importer) convertPho(input, output string, pho Pho, size int, created t
 		return fmt.Errorf("no .convert pipeline in '%s'", pho.Path())
 	}
 
+	conf, err := i.phodoConf()
+	if err != nil {
+		return err
+	}
+
 	// TODO perhaps pass size variable
 	line := pipeline.New().
 		Add(element.LoadFile(input)).
@@ -97,8 +102,8 @@ func (i *Importer) convertPho(input, output string, pho Pho, size int, created t
 		Add(element.Resize(size, size, "", core.ResizeMax|core.ResizeNoUpscale)).
 		Add(element.SaveFile(output, ".jpg", 92))
 
-	rctx := pipeline.NewContext(i.phodoConf.Verbose, pipeline.ModeConvert, context.Background())
-	_, err := line.Do(rctx, nil)
+	rctx := pipeline.NewContext(conf.Verbose, pipeline.ModeConvert, context.Background())
+	_, err = line.Do(rctx, nil)
 	return err
 }
 

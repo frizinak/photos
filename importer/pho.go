@@ -29,13 +29,17 @@ func (p Pho) Hash(w io.Writer) { w.Write(p.hash) }
 
 func (i *Importer) GetPho(link string) (Pho, error) {
 	var pho Pho
-	root, err := phodo.LoadSidecar(i.phodoConf, link)
+	conf, err := i.phodoConf()
+	if err != nil {
+		return pho, err
+	}
+	root, err := phodo.LoadSidecar(conf, link)
 	if err != nil {
 		return pho, err
 	}
 
 	pho.root = root
-	pho.path, err = phodo.SidecarPath(i.phodoConf, link)
+	pho.path, err = phodo.SidecarPath(conf, link)
 	if err != nil {
 		return pho, err
 	}

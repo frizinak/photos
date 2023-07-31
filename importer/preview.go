@@ -11,10 +11,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/frizinak/phodo/phodo"
 	"github.com/frizinak/phodo/pipeline"
 	"github.com/frizinak/phodo/pipeline/element"
 	"github.com/frizinak/photos/imagemagick"
@@ -58,52 +58,29 @@ func RegisterPreviewGen(p PreviewGen) {
 	pgens = append(pgens, p)
 }
 
-type phoPreviewGen struct{}
+type PhoPreviewGen struct {
+	PreviewFile string
+}
 
-func (pho *phoPreviewGen) Name() string { return "Phodo" }
-func (pho *phoPreviewGen) Supports(f *File) bool {
+func (pho *PhoPreviewGen) Name() string { return "Phodo" }
+func (pho *PhoPreviewGen) Supports(f *File) bool {
 	return f.TypeRAW() || f.TypeImage()
 }
 
-func (pho *phoPreviewGen) Make(i *Importer, f *File, output string) error {
-	pl := `
-.preview(
-	resize-fit(1920 1920)
-	orientation()
-
-	exif-allow()
-
-	extend(310 0 0 0)
-	compose(
-		pos(0 0 (
-			histogram(rgb "width-10" 300 2)
-			extend(5)
-			border(2 hex(fff))
-		))
-	)
-)
-`
-	// pl := pipeline.New(
-	// 	element.Resize(1920, 1920, "", core.ResizeMax|core.ResizeNoUpscale),
-	// 	element.CorrectOrientation(),
-	// 	element.ExifAllow([]uint16{}),
-	// 	element.Extend(210, 0, 0, 0),
-	// 	element.Compose(
-	// 		element.NewPos(0, 0, pipeline.New(
-	// 			element.Histogram().RGBImage().BarSize(2).Size(500, 200),
-	// 			element.Extend(5, 5, 5, 5),
-	// 			element.Border(2, element.RGB8(0xff, 0xff, 0xff)),
-	// 		)),
-	// 	),
-	// )
-	dec := pipeline.NewDecoder(strings.NewReader(pl), nil)
-	r, err := dec.Decode(nil)
+func (pho *PhoPreviewGen) Make(i *Importer, f *File, output string) error {
+	conf, err := i.phodoConf()
 	if err != nil {
 		return err
 	}
-	p, ok := r.Get(".preview")
+
+	root, err := phodo.LoadScript(conf, pho.PreviewFile)
+	if err != nil {
+		return err
+	}
+
+	p, ok := root.Get(".main")
 	if !ok {
-		return errors.New("[BUG] no preview pipeline found")
+		return errors.New("no .main pipeline found in preview phodo definition")
 	}
 
 	tmp := output + ".tmp"
@@ -121,16 +98,16 @@ func (pho *phoPreviewGen) Make(i *Importer, f *File, output string) error {
 	return os.Rename(tmp, output)
 }
 
-type rtPreviewGen struct {
+type RTPreviewGen struct {
 }
 
-func (rt *rtPreviewGen) Name() string { return "RawTherapee" }
-func (rt *rtPreviewGen) Supports(f *File) bool {
+func (rt *RTPreviewGen) Name() string { return "RawTherapee" }
+func (rt *RTPreviewGen) Supports(f *File) bool {
 	return rt.Available() && (f.TypeRAW() || f.TypeImage())
 }
-func (rt *rtPreviewGen) Available() bool { return execAvailable("rawtherapee-cli") }
+func (rt *RTPreviewGen) Available() bool { return execAvailable("rawtherapee-cli") }
 
-func (rt *rtPreviewGen) Make(i *Importer, f *File, output string) error {
+func (rt *RTPreviewGen) Make(i *Importer, f *File, output string) error {
 	tmp := output + ".tmp"
 	var pp PP3
 	var err error
@@ -145,15 +122,15 @@ func (rt *rtPreviewGen) Make(i *Importer, f *File, output string) error {
 	return os.Rename(tmp, output)
 }
 
-type imPreviewGen struct{}
+type IMPreviewGen struct{}
 
-func (im *imPreviewGen) Name() string    { return "ImageMagick" }
-func (im *imPreviewGen) Available() bool { return execAvailable("magick") }
-func (im *imPreviewGen) Supports(f *File) bool {
+func (im *IMPreviewGen) Name() string    { return "ImageMagick" }
+func (im *IMPreviewGen) Available() bool { return execAvailable("magick") }
+func (im *IMPreviewGen) Supports(f *File) bool {
 	return im.Available() && (f.TypeRAW() || f.TypeImage())
 }
 
-func (im *imPreviewGen) Make(i *Importer, f *File, output string) error {
+func (im *IMPreviewGen) Make(i *Importer, f *File, output string) error {
 	tmp := output + ".tmp"
 	dst, err := os.Create(tmp)
 	if err != nil {
@@ -171,15 +148,15 @@ func (im *imPreviewGen) Make(i *Importer, f *File, output string) error {
 	return os.Rename(tmp, output)
 }
 
-type vidPreviewGen struct{}
+type VidPreviewGen struct{}
 
-func (vid *vidPreviewGen) Name() string    { return "FFMPEG" }
-func (vid *vidPreviewGen) Available() bool { return execAvailable("ffmpeg") }
-func (vid *vidPreviewGen) Supports(f *File) bool {
+func (vid *VidPreviewGen) Name() string    { return "FFMPEG" }
+func (vid *VidPreviewGen) Available() bool { return execAvailable("ffmpeg") }
+func (vid *VidPreviewGen) Supports(f *File) bool {
 	return vid.Available() && f.TypeVideo()
 }
 
-func (vid *vidPreviewGen) Make(i *Importer, f *File, output string) error {
+func (vid *VidPreviewGen) Make(i *Importer, f *File, output string) error {
 	p, err := tags.ParseFFProbe(f.Path())
 	if err != nil {
 		return err
@@ -311,13 +288,6 @@ func (vid *vidPreviewGen) Make(i *Importer, f *File, output string) error {
 	}
 
 	return os.Rename(tmp, output)
-}
-
-func init() {
-	RegisterPreviewGen(&phoPreviewGen{})
-	RegisterPreviewGen(&rtPreviewGen{})
-	RegisterPreviewGen(&imPreviewGen{})
-	RegisterPreviewGen(&vidPreviewGen{})
 }
 
 func PreviewFile(f *File) string {

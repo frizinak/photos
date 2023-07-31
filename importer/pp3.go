@@ -11,6 +11,7 @@ import (
 )
 
 type PP3 struct {
+	path string
 	*pp3.PP3
 }
 
@@ -24,8 +25,12 @@ func (pp PP3) Edited() bool {
 func (i *Importer) GetPP3(link string) (PP3, error) {
 	pp3Path := fmt.Sprintf("%s.pp3", link)
 	pp3, err := pp3.Load(pp3Path)
-	return PP3{pp3}, err
+	return PP3{pp3Path, pp3}, err
 }
+
+func (pp PP3) Path() string { return pp.path }
+
+func (pp PP3) Save() error { return pp.SaveTo(pp.path) }
 
 func (i *Importer) PP3ToMeta(link string) error {
 	file, err := i.fileFromLink(link)
