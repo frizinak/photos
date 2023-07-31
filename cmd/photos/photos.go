@@ -16,7 +16,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"runtime/pprof"
 	"sort"
 	"strings"
 	"sync"
