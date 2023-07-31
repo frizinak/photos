@@ -6,7 +6,7 @@ replace github.com/dsoprea/go-exif/v3 v3.0.0-20210625224831-a6301f85c82b => gith
 
 require (
 	github.com/frizinak/gphoto2go v0.0.0-20200727103018-6698a73f379d
-	github.com/frizinak/phodo v0.0.0-20230731132720-abd17f0ffa95
+	github.com/frizinak/phodo v0.0.0-20230731150047-168732e2f9e1
 	github.com/go-gl/gl v0.0.0-20211210172815-726fda9656d6
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20221017161538-93cebf72946b
 	github.com/go-gl/mathgl v1.0.0
