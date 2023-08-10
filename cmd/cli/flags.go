@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/frizinak/phodo/phodo"
+	"github.com/frizinak/phodo/pipeline"
 	"github.com/frizinak/photos/cmd/flags"
 	"github.com/frizinak/photos/importer"
 	"github.com/frizinak/photos/meta"
@@ -430,7 +431,9 @@ func (f *Flags) PhodoConf() (phodo.Conf, error) {
 	}
 	conf := phodo.NewConf(os.Stderr, nil)
 	conf.EditorString = f.editor
-	conf.Verbose = f.Verbose()
+	if f.Verbose() {
+		conf.Verbose = int(pipeline.VerboseTime)
+	}
 	var err error
 	conf, err = conf.Parse()
 	if err != nil {

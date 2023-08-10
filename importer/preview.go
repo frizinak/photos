@@ -88,7 +88,7 @@ func (pho *PhoPreviewGen) Make(i *Importer, f *File, output string) error {
 	line.Add(element.LoadFile(f.Path()))
 	line.Add(p.Element)
 	line.Add(element.SaveFile(tmp, ".jpg", 75))
-	rctx := pipeline.NewContext(false, pipeline.ModeConvert, context.Background())
+	rctx := pipeline.NewContext(pipeline.VerboseNone, io.Discard, pipeline.ModeConvert, context.Background())
 	_, err = line.Do(rctx, nil)
 	if err != nil {
 		os.Remove(tmp)
