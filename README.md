@@ -3,10 +3,9 @@
 
 ## Dependencies
 
-- imagemagick         (`-action previews` if rawtherapee not in PATH)
 - libgphoto2          (`-action import`) if not compiled with `-tags gphoto2cli` (preferred)
 - gphoto2             (`-action import`) if compiled with `-tags gphoto2cli`
-- ffmpeg for .MOVs    (`-action import`, currently only uses ffprobe for metadata)
+- ffmpeg for videos   (`-action import`, currently only uses ffprobe for metadata)
 - rawtherapee         (`-action convert` optional, if you dont use the [phodo](https://github.com/frizinak/phodo) edit workflow)
 
 ## What it does
@@ -16,7 +15,7 @@
 3. At this point you can:
     - rename and/or move any of those symlink (as long as the symlink stays intact and remains a descendant of `-collection`)
     - review em using the builtin rating application `-action rate`
-    - edit the raws in `-collection` with rawtherapee or `-action edit` / `-action rate`
+    - edit the raws in `-collection` with rawtherapee or `-action edit` / `-action rate` / `phodo edit`
 4. Ratings and deleted/trash flag will be synced between all symlinks of a given raw
 5. Convert images to jpegs using the rawtherapee.pp3 or phodo.pho sidecar file and store em in `-jpegs` using the same directory hierarchy as the one we/you have created in `-collection`
 
