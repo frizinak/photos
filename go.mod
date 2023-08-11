@@ -16,6 +16,7 @@ require (
 
 require (
 	github.com/Andeling/tiff v0.0.0-20200203003012-f6e011e4b554 // indirect
+	github.com/frizinak/binary v0.1.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/mattn/anko v0.1.9 // indirect

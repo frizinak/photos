@@ -3,7 +3,6 @@ package importer
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"time"
 
@@ -15,6 +14,10 @@ type PP3 struct {
 	*pp3.PP3
 }
 
+func (i *Importer) pp3Path(link string) string {
+	return fmt.Sprintf("%s.pp3", link)
+}
+
 func (pp PP3) Edited() bool {
 	if pp.PP3 == nil {
 		return false
@@ -23,14 +26,13 @@ func (pp PP3) Edited() bool {
 }
 
 func (i *Importer) GetPP3(link string) (PP3, error) {
-	pp3Path := fmt.Sprintf("%s.pp3", link)
+	pp3Path := i.pp3Path(link)
 	pp3, err := pp3.Load(pp3Path)
 	return PP3{pp3Path, pp3}, err
 }
 
 func (pp PP3) Path() string { return pp.path }
-
-func (pp PP3) Save() error { return pp.SaveTo(pp.path) }
+func (pp PP3) Save() error  { return pp.SaveTo(pp.path) }
 
 func (i *Importer) PP3ToMeta(link string) error {
 	file, err := i.fileFromLink(link)
@@ -49,7 +51,15 @@ func (i *Importer) PP3ToMeta(link string) error {
 	}
 
 	m.Deleted = pp.Trashed()
-	m.Rating = pp.Rank()
+	r := pp.Rank()
+	if r < 0 {
+		r = 0
+	}
+	if r > 0xff {
+		r = 0xff
+	}
+
+	m.Rating = uint8(r)
 	m.Tags = pp.Keywords()
 
 	return SaveMeta(file, m)
@@ -77,7 +87,7 @@ func (i *Importer) MetaToPP3(link string) error {
 		}
 	}
 
-	pp.SetRank(meta.Rating)
+	pp.SetRank(int(meta.Rating))
 	pp.Trash(meta.Deleted)
 	pp.SetKeywords(meta.Tags.Unique())
 
@@ -207,28 +217,11 @@ func (i *Importer) SyncMetaAndPP3(f *File) error {
 		return err
 	}
 
-	meta, err := GetMeta(f)
-	if err != nil {
-		return err
-	}
-
 	files := []string{metaFile(f)}
-	newpp := []string{}
 	for _, path := range paths {
 		pp3 := path + ".pp3"
 		files = append(files, pp3)
-		rel, err := filepath.Rel(i.colDir, pp3)
 		if err != nil {
-			return err
-		}
-		newpp = append(newpp, rel)
-	}
-	sort.Strings(meta.PP3)
-	sort.Strings(newpp)
-	if !strEqual(meta.PP3, newpp) {
-		changed = true
-		meta.PP3 = newpp
-		if err := SaveMeta(f, meta); err != nil {
 			return err
 		}
 	}

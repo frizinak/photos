@@ -480,11 +480,11 @@ func (f *Flags) makeFilters(imp *importer.Importer) {
 			}
 		case flags.FilterRated:
 			_mf = func(meta meta.Meta, fl *importer.File) bool {
-				return meta.Rating > 0 && meta.Rating < 6
+				return meta.Rating > 0
 			}
 		case flags.FilterUnrated:
 			_mf = func(meta meta.Meta, fl *importer.File) bool {
-				return meta.Rating < 1 || meta.Rating > 5
+				return meta.Rating == 0
 			}
 		case flags.FilterUpdated:
 			weight = 99
@@ -574,7 +574,8 @@ func (f *Flags) MetaFilter(imp *importer.Importer) MetaFilter {
 	}
 	f.makeFilters(imp)
 	f.metafilter = func(m meta.Meta, fl *importer.File) bool {
-		if m.Rating <= f.rating.gt || m.Rating >= f.rating.lt {
+		r := int(m.Rating)
+		if r <= f.rating.gt || r >= f.rating.lt {
 			return false
 		}
 		if f.time.since != nil && f.time.since.After(m.CreatedTime()) {

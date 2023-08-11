@@ -15,6 +15,15 @@ type Pho struct {
 	root *pipeline.Root
 }
 
+func (i *Importer) phoPath(link string) (string, error) {
+	conf, err := i.phodoConf()
+	if err != nil {
+		return "", err
+	}
+
+	return phodo.SidecarPath(conf, link)
+}
+
 func (p Pho) Edited() bool {
 	_, ok := p.Convert()
 	return ok

@@ -3,6 +3,8 @@ github.com/Andeling/tiff v0.0.0-20200203003012-f6e011e4b554/go.mod h1:6gTTE2pNYZ
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/frizinak/binary v0.1.0 h1:JKqTBgHFzbRCYf7jjvwyKp95xeqt9RSi0l0rdxvSdu0=
+github.com/frizinak/binary v0.1.0/go.mod h1:XLSAtIYW86xHUC90aSQBD0h6SSkh/p5JdKXUB+tXsEE=
 github.com/frizinak/gphoto2go v0.0.0-20200727103018-6698a73f379d h1:Fv+e/CJVxC0089QeeeanwpyXD48hkscDOzl/JqCUbdc=
 github.com/frizinak/gphoto2go v0.0.0-20200727103018-6698a73f379d/go.mod h1:JPIY4BwqouMp6+2BN5SU4l/42RtU3pavADGCQCxaGNU=
 github.com/frizinak/phodo v0.1.0 h1:mp9Z1oCz/eXH43yRi8Zy8YgnEYqemdt1HQBMlx0YB7Y=

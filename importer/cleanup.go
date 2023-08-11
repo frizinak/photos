@@ -82,7 +82,8 @@ func (i *Importer) Cleanup(minRating int) ([]string, error) {
 			return nil, err
 		}
 
-		if (m.Deleted || m.Rating <= minRating) && len(m.Conv) != 0 {
+		r := int(m.Rating)
+		if (m.Deleted || r <= minRating) && len(m.Conv) != 0 {
 			m.Conv = make(map[string]meta.Converted)
 			if err = SaveMeta(f, m); err != nil {
 				return nil, err
@@ -97,8 +98,16 @@ func (i *Importer) Cleanup(minRating int) ([]string, error) {
 			converted[n] = struct{}{}
 		}
 
-		for _, n := range m.PP3 {
-			pp3[n] = struct{}{}
+		links, err := i.FindLinks(f)
+		if err != nil {
+			return nil, err
+		}
+		for _, l := range links {
+			rel, err := filepath.Rel(i.colDir, i.pp3Path(l))
+			if err != nil {
+				return nil, err
+			}
+			pp3[rel] = struct{}{}
 		}
 	}
 

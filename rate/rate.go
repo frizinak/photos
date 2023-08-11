@@ -592,7 +592,7 @@ func (r *Rater) onKeyMain(w *glfw.Window, key glfw.Key, scancode int, action glf
 				m.Deleted = upd.Deleted == 1
 			}
 			if upd.Rating > -1 {
-				m.Rating = upd.Rating
+				m.Rating = uint8(upd.Rating)
 			}
 			return true, nil
 		})

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/frizinak/binary"
 	"github.com/frizinak/phodo/exif"
 )
 
@@ -21,7 +22,21 @@ type ShutterSpeed struct{ fraction }
 type FocalLength struct{ fraction }
 type ISO int
 
+func (i ISO) BinaryEncode(w *binary.Writer)     { w.WriteUint32(uint32(i)) }
+func (i ISO) BinaryDecode(r *binary.Reader) ISO { return ISO(r.ReadUint32()) }
+
 type fraction [2]uint
+
+func (f fraction) BinaryEncode(w *binary.Writer) {
+	w.WriteUint64(uint64(f[0]))
+	w.WriteUint64(uint64(f[1]))
+}
+
+func (f fraction) BinaryDecode(r *binary.Reader) fraction {
+	f[0] = uint(r.ReadUint64())
+	f[1] = uint(r.ReadUint64())
+	return f
+}
 
 func (f fraction) Nil() bool { return f[0] == 0 || f[1] == 0 }
 
@@ -61,6 +76,17 @@ type Device struct {
 	Make, Model string
 }
 
+func (d Device) BinaryEncode(w *binary.Writer) {
+	w.WriteString(d.Make, 16)
+	w.WriteString(d.Model, 16)
+}
+
+func (d Device) BinaryDecode(r *binary.Reader) Device {
+	d.Make = r.ReadString(16)
+	d.Model = r.ReadString(16)
+	return d
+}
+
 type CameraInfo struct {
 	Device
 	Lens         Device
@@ -68,6 +94,25 @@ type CameraInfo struct {
 	ShutterSpeed ShutterSpeed
 	FocalLength  FocalLength
 	ISO          ISO
+}
+
+func (c CameraInfo) BinaryEncode(w *binary.Writer) {
+	c.Device.BinaryEncode(w)
+	c.Lens.BinaryEncode(w)
+	c.Aperture.BinaryEncode(w)
+	c.ShutterSpeed.BinaryEncode(w)
+	c.FocalLength.BinaryEncode(w)
+	c.ISO.BinaryEncode(w)
+}
+
+func (c CameraInfo) BinaryDecode(r *binary.Reader) CameraInfo {
+	c.Device = c.Device.BinaryDecode(r)
+	c.Lens = c.Lens.BinaryDecode(r)
+	c.Aperture = Aperture{c.Aperture.BinaryDecode(r)}
+	c.ShutterSpeed = ShutterSpeed{c.ShutterSpeed.BinaryDecode(r)}
+	c.FocalLength = FocalLength{c.FocalLength.BinaryDecode(r)}
+	c.ISO = c.ISO.BinaryDecode(r)
+	return c
 }
 
 func (c CameraInfo) DeviceString() string {
