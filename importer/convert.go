@@ -102,7 +102,7 @@ func (i *Importer) convertPho(input, output string, pho Pho, size int, created t
 		Add(element.Resize(size, size, "", core.ResizeMax|core.ResizeNoUpscale)).
 		Add(element.SaveFile(output, ".jpg", 92))
 
-	rctx := pipeline.NewContext(pipeline.Verbosity(conf.Verbose), i.log.Writer(), pipeline.ModeConvert, context.Background())
+	rctx := pipeline.NewContext(conf.Verbose, i.log.Writer(), pipeline.ModeConvert, context.Background())
 	_, err = line.Do(rctx, nil)
 	return err
 }
