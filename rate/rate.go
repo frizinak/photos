@@ -251,7 +251,6 @@ q | esc      : cancel
 			r.term.clrBlueContrast,
 			r.term.none,
 		)
-
 	}
 
 	if r.text {
@@ -336,6 +335,13 @@ q | esc      : cancel
 	switch key {
 	case glfw.KeyQ, glfw.KeyEscape:
 		r.toggleTagging()
+
+	case glfw.KeyLeft, glfw.KeyLeftBracket:
+		r.addIndex(-1)
+		help(r.file())
+	case glfw.KeyRight, glfw.KeyRightBracket, glfw.KeySpace:
+		r.addIndex(1)
+		help(r.file())
 
 	case glfw.KeyC:
 		var last meta.Tags
