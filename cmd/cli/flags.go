@@ -487,9 +487,13 @@ func (f *Flags) makeFilters(imp *importer.Importer) {
 				return meta.Rating == 0
 			}
 		case flags.FilterUpdated:
+			sizes := f.Sizes()
+			if len(sizes) == 0 {
+				f.Exit(errors.New("no sizes specified"))
+			}
 			weight = 99
 			_mf = func(meta meta.Meta, fl *importer.File) bool {
-				c, err := imp.CheckConvert(fl, f.Sizes())
+				c, err := imp.CheckConvert(fl, sizes)
 				f.Exit(err)
 				return c
 			}
