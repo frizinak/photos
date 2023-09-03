@@ -11,7 +11,7 @@ require (
 	github.com/go-gl/mathgl v1.0.0
 	github.com/json-iterator/go v1.1.12
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
-	golang.org/x/image v0.9.0
+	golang.org/x/image v0.11.0
 	gopkg.in/ini.v1 v1.66.4
 )
 
@@ -22,5 +22,5 @@ require (
 	github.com/mattn/anko v0.1.9 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	golang.org/x/text v0.11.0 // indirect
+	golang.org/x/text v0.12.0 // indirect
 )
