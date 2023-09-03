@@ -50,7 +50,7 @@ which defaults to
 - Rate images.
 - Sync metadata to rawtherapees .pp3 files.
 
-`photos -base my_library -action rate,sync-meta,link -filter unrated`
+`photos -base my_library -action rate,sync-meta,link -unrated`
 
 - Remove converted images and pp3s whose RAWs have been deleted and/or those with a low rating.
 
@@ -58,7 +58,7 @@ which defaults to
 
 - Convert images with a rating > 2 and have been opened in rawtherapee or a .convert() target in phodo sidecar file (-edited) to jpegs
 
-`photos -base my_library -action convert -sizes 3840,1920,800 -filter undeleted,edited -gt 2
+`photos -base my_library -action convert -sizes 3840,1920,800 -undeleted -edited -gt 2`
 
 - Merge library `two` onto `one`
 
