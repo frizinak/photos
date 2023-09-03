@@ -3,7 +3,6 @@ package gphotos
 import (
 	"errors"
 	"io"
-	"io/ioutil"
 	"mime"
 	"net/http"
 	"os"
@@ -115,7 +114,7 @@ func (g *GPhotos) upload(name, mime string, r io.Reader) (string, error) {
 	}
 	defer res.Body.Close()
 
-	d, err := ioutil.ReadAll(res.Body)
+	d, err := io.ReadAll(res.Body)
 	return string(d), err
 }
 

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"math"
 	"os"
@@ -441,7 +441,7 @@ func (f *Flags) PhodoConf() (phodo.Conf, error) {
 		return conf, err
 	}
 
-	c, err := ioutil.ReadFile(f.phodoDefault)
+	c, err := os.ReadFile(f.phodoDefault)
 	if err != nil {
 		return conf, err
 	}
@@ -1087,7 +1087,7 @@ func (f *Flags) Parse() {
 
 	f.log = log.New(os.Stderr, "", log.LstdFlags)
 	if !verbose {
-		f.log = log.New(ioutil.Discard, "", 0)
+		f.log = log.New(io.Discard, "", 0)
 	}
 }
 
