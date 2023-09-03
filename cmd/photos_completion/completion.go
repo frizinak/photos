@@ -50,12 +50,6 @@ func main() {
 			opts = append(opts, i)
 		}
 
-	case flags.Filters:
-		comma = true
-		for i := range flags.AllFilters {
-			opts = append(opts, i)
-		}
-
 	case flags.GT:
 		for i := 0; i < 5; i++ {
 			opts = append(opts, strconv.Itoa(i))
@@ -66,6 +60,29 @@ func main() {
 		}
 
 	case flags.Checksum, flags.AlwaysYes, flags.Zero, flags.NoRawPrefix, flags.Verbose:
+		fl = ""
+
+	case flags.Undeleted:
+		fl = ""
+	case flags.Deleted:
+		fl = ""
+	case flags.Updated:
+		fl = ""
+	case flags.Edited:
+		fl = ""
+	case flags.Unedited:
+		fl = ""
+	case flags.Rated:
+		fl = ""
+	case flags.Unrated:
+		fl = ""
+	case flags.Location:
+		fl = ""
+	case flags.NoLocation:
+		fl = ""
+	case flags.Photo:
+		fl = ""
+	case flags.Video:
 		fl = ""
 	}
 

@@ -119,22 +119,22 @@ var lists = Lists{
 				"Import media from connected camera (gphoto2) and any given directory (-source) to the directory specified with -raws",
 			},
 			flags.ActionShow: {
-				"Show raws (filter with -filter)",
+				"Show raws",
 			},
 			flags.ActionShowPreviews: {
-				"Show jpegs (filter with -filter) (see -no-raw)",
+				"Show previews",
 			},
 			flags.ActionShowJPEGs: {
-				"Show previews (filter with -filter) (see -no-raw)",
+				"Show jpegs",
 			},
 			flags.ActionShowLinks: {
-				"Show links (filter with -filter) (see -no-raw)",
+				"Show links",
 			},
 			flags.ActionShowTags: {
 				"Show all tags",
 			},
 			flags.ActionInfo: {
-				"Show info (filter with -filter)",
+				"Show info",
 			},
 			flags.ActionLink: {
 				"Create collection symlinks in the given directory (-collection)",
@@ -143,7 +143,7 @@ var lists = Lists{
 				"Generate simple jpeg previews (used by -action rate)",
 			},
 			flags.ActionRate: {
-				"Simple opengl window to rate / trash images (filter with -filter)",
+				"Simple opengl window to rate / trash images",
 			},
 			flags.ActionEdit: {
 				"Run the phodo editor for each image.",
@@ -155,7 +155,7 @@ var lists = Lists{
 				"Rewrite .meta, make sure you synced first so newer pp3s are not overwritten.",
 			},
 			flags.ActionConvert: {
-				"Convert images to jpegs resized with -sizes (filter with -filter)",
+				"Convert images to jpegs resized with -sizes",
 				"These conversions are tracked in .meta i.e.:",
 				"running",
 				"photos ... -action convert -sizes 3840,1920 and later",
@@ -164,11 +164,11 @@ var lists = Lists{
 			},
 			flags.ActionExec: {
 				"Run an external command for each file (first non flag and any further arguments, {} is replaced with the filepath)",
-				"e.g.: photos -base . -action exec -filter all wc -c {}",
+				"e.g.: photos -base . -action exec wc -c {}",
 			},
 			flags.ActionCleanup: {
 				"Remove pp3s and jpegs for deleted RAWs",
-				"-filter and -lt are ignored",
+				"all filters and -lt are ignored",
 				"Images whose rating is not higher than -gt will also have their jpegs deleted.",
 				"!Note: .meta files are seen as the single source of truth, so run sync-meta before",
 			},
@@ -187,43 +187,44 @@ var lists = Lists{
 			},
 		},
 	},
-	flags.Filters: {
-		help: "[any] filters (comma separated and/or specified multiple times)",
-		list: map[string][]string{
-			flags.FilterUndeleted: {
-				"ignore trashed/deleted files",
-			},
-			flags.FilterDeleted: {
-				"only include trashed/deleted files",
-			},
-			flags.FilterUpdated: {
-				"only include files that need to be converted (updated pp3). be sure to pass the correct -sizes",
-			},
-			flags.FilterUnedited: {
-				"only include files with incomplete pp3s (never opened in rawtherapee)",
-			},
-			flags.FilterEdited: {
-				"only include files with complete pp3s (have been opened in rawtherapee)",
-			},
-			flags.FilterRated: {
-				"only include rated files",
-			},
-			flags.FilterUnrated: {
-				"only include unrated files",
-			},
-			flags.FilterLocation: {
-				"only include files with a location",
-			},
-			flags.FilterNoLocation: {
-				"only include files with no location",
-			},
-		},
+	flags.Undeleted: {
+		help: "[any] ignore trashed/deleted files",
+	},
+	flags.Deleted: {
+		help: "[any] only include trashed/deleted files",
+	},
+	flags.Updated: {
+		help: "[any] only include files that need to be converted (updated pp3). be sure to pass the correct -sizes",
+	},
+	flags.Unedited: {
+		help: "[any] only include files with incomplete pp3s (never opened in rawtherapee)",
+	},
+	flags.Edited: {
+		help: "[any] only include files with complete pp3s (have been opened in rawtherapee)",
+	},
+	flags.Rated: {
+		help: "[any] only include rated files",
+	},
+	flags.Unrated: {
+		help: "[any] only include unrated files",
+	},
+	flags.Location: {
+		help: "[any] only include files with a location",
+	},
+	flags.NoLocation: {
+		help: "[any] only include files with no location",
+	},
+	flags.Photo: {
+		help: "[any] only include photos",
+	},
+	flags.Video: {
+		help: "[any] only include videos",
 	},
 	flags.GT: {
-		help: "[any] greater than given rating filter",
+		help: "[any] only files with a rating greater than the one specified",
 	},
 	flags.LT: {
-		help: "[any] less than given rating filter",
+		help: "[any] only files with a rating less than the one specified",
 	},
 	flags.Camera: {
 		help: "[any] filter camera make and model (* as wildcard, case insensitive)",
@@ -332,7 +333,7 @@ type Flags struct {
 	lists Lists
 
 	actions  []string
-	filters  []string
+	filters  map[string]bool
 	ext      string
 	file     []string
 	camera   []string
@@ -465,28 +466,31 @@ func (f *Flags) makeFilters(imp *importer.Importer) {
 	}
 	mlist := make(mfws, 0, len(f.filters))
 	list := make(fws, 0, len(f.filters))
-	for _, filter := range f.filters {
+	for filter, enabled := range f.filters {
+		if !enabled {
+			continue
+		}
 		var _mf MetaFilter
 		var _f Filter
 		var weight int
 		switch filter {
-		case flags.FilterUndeleted:
+		case flags.Undeleted:
 			_mf = func(meta meta.Meta, fl *importer.File) bool {
 				return !meta.Deleted
 			}
-		case flags.FilterDeleted:
+		case flags.Deleted:
 			_mf = func(meta meta.Meta, fl *importer.File) bool {
 				return meta.Deleted
 			}
-		case flags.FilterRated:
+		case flags.Rated:
 			_mf = func(meta meta.Meta, fl *importer.File) bool {
 				return meta.Rating > 0
 			}
-		case flags.FilterUnrated:
+		case flags.Unrated:
 			_mf = func(meta meta.Meta, fl *importer.File) bool {
 				return meta.Rating == 0
 			}
-		case flags.FilterUpdated:
+		case flags.Updated:
 			sizes := f.Sizes()
 			if len(sizes) == 0 {
 				f.Exit(errors.New("no sizes specified"))
@@ -497,28 +501,32 @@ func (f *Flags) makeFilters(imp *importer.Importer) {
 				f.Exit(err)
 				return c
 			}
-		case flags.FilterEdited:
+		case flags.Edited:
 			weight = 50
 			_mf = func(meta meta.Meta, fl *importer.File) bool {
 				b, err := imp.Unedited(fl)
 				f.Exit(err)
 				return !b
 			}
-		case flags.FilterUnedited:
+		case flags.Unedited:
 			weight = 50
 			_mf = func(meta meta.Meta, fl *importer.File) bool {
 				b, err := imp.Unedited(fl)
 				f.Exit(err)
 				return b
 			}
-		case flags.FilterLocation:
+		case flags.Location:
 			_mf = func(meta meta.Meta, fl *importer.File) bool {
 				return meta.Location != nil
 			}
-		case flags.FilterNoLocation:
+		case flags.NoLocation:
 			_mf = func(meta meta.Meta, fl *importer.File) bool {
 				return meta.Location == nil
 			}
+		case flags.Photo:
+			_f = func(fl *importer.File) bool { return fl.TypeImage() || fl.TypeRAW() }
+		case flags.Video:
+			_f = func(fl *importer.File) bool { return fl.TypeVideo() }
 		default:
 			f.Exit(fmt.Errorf("unknown filter %s", filter))
 		}
@@ -530,6 +538,7 @@ func (f *Flags) makeFilters(imp *importer.Importer) {
 			mlist = append(mlist, MetaFilterWeight{_mf, weight})
 		}
 	}
+
 	f.mfilterFuncs = mlist
 	f.filterFuncs = list
 
@@ -778,9 +787,8 @@ func (f *Flags) Exit(err error) {
 
 func (f *Flags) Parse() {
 	var actions flagStrs
-	var filters flagStrs
-	var ratingGTFilter int
-	var ratingLTFilter int
+	var ratingGT int
+	var ratingLT int
 	var ext string
 	var file string
 	var camera string
@@ -804,11 +812,35 @@ func (f *Flags) Parse() {
 	var verbose bool
 	var editor string
 
+	var undeleted bool
+	var deleted bool
+	var updated bool
+	var edited bool
+	var unedited bool
+	var rated bool
+	var unrated bool
+	var location bool
+	var noLocation bool
+	var photo bool
+	var video bool
+
 	f.fs.BoolVar(&help, "h", false, "\nhelp\n")
 	f.fs.Var(&actions, flags.Actions, f.lists.Help(flags.Actions))
-	f.fs.Var(&filters, flags.Filters, f.lists.Help(flags.Filters))
-	f.fs.IntVar(&ratingGTFilter, flags.GT, -1, f.lists.Help(flags.GT))
-	f.fs.IntVar(&ratingLTFilter, flags.LT, 6, f.lists.Help(flags.LT))
+
+	f.fs.BoolVar(&undeleted, flags.Undeleted, false, f.lists.Help(flags.Undeleted))
+	f.fs.BoolVar(&deleted, flags.Deleted, false, f.lists.Help(flags.Deleted))
+	f.fs.BoolVar(&updated, flags.Updated, false, f.lists.Help(flags.Updated))
+	f.fs.BoolVar(&edited, flags.Edited, false, f.lists.Help(flags.Edited))
+	f.fs.BoolVar(&unedited, flags.Unedited, false, f.lists.Help(flags.Unedited))
+	f.fs.BoolVar(&rated, flags.Rated, false, f.lists.Help(flags.Rated))
+	f.fs.BoolVar(&unrated, flags.Unrated, false, f.lists.Help(flags.Unrated))
+	f.fs.BoolVar(&location, flags.Location, false, f.lists.Help(flags.Location))
+	f.fs.BoolVar(&noLocation, flags.NoLocation, false, f.lists.Help(flags.NoLocation))
+	f.fs.BoolVar(&photo, flags.Photo, false, f.lists.Help(flags.Photo))
+	f.fs.BoolVar(&video, flags.Video, false, f.lists.Help(flags.Video))
+
+	f.fs.IntVar(&ratingGT, flags.GT, -1, f.lists.Help(flags.GT))
+	f.fs.IntVar(&ratingLT, flags.LT, 6, f.lists.Help(flags.LT))
 	f.fs.StringVar(&ext, flags.Ext, "", f.lists.Help(flags.Ext))
 	f.fs.StringVar(&file, flags.File, "", f.lists.Help(flags.File))
 	f.fs.StringVar(&camera, flags.Camera, "", f.lists.Help(flags.Camera))
@@ -946,11 +978,18 @@ func (f *Flags) Parse() {
 		}
 	}
 
-	f.filters = flags.CommaSep(strings.Join(filters, ","))
-	for _, fi := range f.filters {
-		if _, ok := flags.AllFilters[fi]; !ok {
-			f.Err(fmt.Errorf("filter %s does not exist", fi))
-		}
+	f.filters = map[string]bool{
+		flags.Undeleted:  undeleted,
+		flags.Deleted:    deleted,
+		flags.Updated:    updated,
+		flags.Edited:     edited,
+		flags.Unedited:   unedited,
+		flags.Rated:      rated,
+		flags.Unrated:    unrated,
+		flags.Location:   location,
+		flags.NoLocation: noLocation,
+		flags.Photo:      photo,
+		flags.Video:      video,
 	}
 
 	if baseDir != "" {
@@ -1032,8 +1071,8 @@ func (f *Flags) Parse() {
 	}
 
 	f.sourceDirs = fsSources
-	f.rating.gt = ratingGTFilter
-	f.rating.lt = ratingLTFilter
+	f.rating.gt = ratingGT
+	f.rating.lt = ratingLT
 	f.checksum = checksum
 	f.importJPEG = importJPEG
 	f.alwaysYes = alwaysYes

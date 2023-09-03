@@ -18,7 +18,17 @@ func CommaSep(v string) []string {
 
 const (
 	Actions            = "action"
-	Filters            = "filter"
+	Undeleted          = "undeleted"
+	Deleted            = "deleted"
+	Updated            = "updated"
+	Edited             = "edited"
+	Unedited           = "unedited"
+	Rated              = "rated"
+	Unrated            = "unrated"
+	Location           = "location"
+	NoLocation         = "nolocation"
+	Photo              = "photo"
+	Video              = "video"
 	GT                 = "gt"
 	LT                 = "lt"
 	Camera             = "camera"
@@ -69,22 +79,22 @@ const (
 	ActionTagsAdd      = "add-tags"
 	ActionGPhotos      = "gphotos"
 	ActionGLocation    = "glocation"
-
-	FilterUndeleted  = "undeleted"
-	FilterDeleted    = "deleted"
-	FilterUpdated    = "updated"
-	FilterEdited     = "edited"
-	FilterUnedited   = "unedited"
-	FilterRated      = "rated"
-	FilterUnrated    = "unrated"
-	FilterLocation   = "location"
-	FilterNoLocation = "nolocation"
 )
 
 var (
 	AllFlags = map[string]struct{}{
 		Actions:            {},
-		Filters:            {},
+		Undeleted:          {},
+		Deleted:            {},
+		Updated:            {},
+		Edited:             {},
+		Unedited:           {},
+		Rated:              {},
+		Unrated:            {},
+		Location:           {},
+		NoLocation:         {},
+		Photo:              {},
+		Video:              {},
 		GT:                 {},
 		LT:                 {},
 		Camera:             {},
@@ -96,6 +106,7 @@ var (
 		Until:              {},
 		Tags:               {},
 		Checksum:           {},
+		ImportJPEG:         {},
 		Sizes:              {},
 		RawDir:             {},
 		CollectionDir:      {},
@@ -134,17 +145,5 @@ var (
 		ActionTagsAdd:      {},
 		ActionGPhotos:      {},
 		ActionGLocation:    {},
-	}
-
-	AllFilters = map[string]struct{}{
-		FilterUndeleted:  {},
-		FilterDeleted:    {},
-		FilterUpdated:    {},
-		FilterEdited:     {},
-		FilterUnedited:   {},
-		FilterRated:      {},
-		FilterUnrated:    {},
-		FilterLocation:   {},
-		FilterNoLocation: {},
 	}
 )
