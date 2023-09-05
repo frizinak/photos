@@ -185,6 +185,9 @@ var lists = Lists{
 				"Update meta with location information extracted from google timeline kmls",
 				"requires -glocation flag with a directory where you downloaded history-YYYY-MM-DD.kml files",
 			},
+			flags.ActionVersion: {
+				"Print version",
+			},
 		},
 	},
 	flags.Undeleted: {

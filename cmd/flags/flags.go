@@ -79,6 +79,7 @@ const (
 	ActionTagsAdd      = "add-tags"
 	ActionGPhotos      = "gphotos"
 	ActionGLocation    = "glocation"
+	ActionVersion      = "version"
 )
 
 var (
@@ -145,5 +146,6 @@ var (
 		ActionTagsAdd:      {},
 		ActionGPhotos:      {},
 		ActionGLocation:    {},
+		ActionVersion:      {},
 	}
 )

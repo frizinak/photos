@@ -32,6 +32,7 @@ import (
 	"github.com/frizinak/photos/importer/libgphoto2"
 	"github.com/frizinak/photos/meta"
 	"github.com/frizinak/photos/rate"
+	"github.com/frizinak/version"
 )
 
 type FileMeta struct {
@@ -836,6 +837,9 @@ Exposure: %s
 				}, nil
 
 			})
+		},
+		flags.ActionVersion: func() {
+			fmt.Println(version.Get())
 		},
 	}
 

@@ -9,6 +9,8 @@ github.com/frizinak/gphoto2go v0.0.0-20200727103018-6698a73f379d h1:Fv+e/CJVxC00
 github.com/frizinak/gphoto2go v0.0.0-20200727103018-6698a73f379d/go.mod h1:JPIY4BwqouMp6+2BN5SU4l/42RtU3pavADGCQCxaGNU=
 github.com/frizinak/phodo v0.2.1 h1:ehuIKn+2kzrcR2o9v/v75M/I1yfNGIqtK2PEc1BgF9Q=
 github.com/frizinak/phodo v0.2.1/go.mod h1:6tqH+fAhSLW2wyxicSdFd/dvET8K3B/mW7fM4sLaDMM=
+github.com/frizinak/version v0.1.1 h1:fP/201u3sDI2+En01wK+9Ymtq7uLbROGDkDm2FEpFtE=
+github.com/frizinak/version v0.1.1/go.mod h1:6H3Ze6VCg1n8wP4wX1dyV3kYn6bLNbh3f2U5YuMbOvw=
 github.com/go-gl/gl v0.0.0-20211210172815-726fda9656d6 h1:zDw5v7qm4yH7N8C8uWd+8Ii9rROdgWxQuGoJ9WDXxfk=
 github.com/go-gl/gl v0.0.0-20211210172815-726fda9656d6/go.mod h1:9YTyiznxEY1fVinfM7RvRcjRHbw2xLBJ3AAGIT0I4Nw=
 github.com/go-gl/glfw/v3.3/glfw v0.0.0-20221017161538-93cebf72946b h1:GgabKamyOYguHqHjSkDACcgoPIz3w0Dis/zJ1wyHHHU=
