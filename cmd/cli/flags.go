@@ -435,9 +435,11 @@ func (f *Flags) PhodoConf() (phodo.Conf, error) {
 	}
 	conf := phodo.NewConf(os.Stderr, nil)
 	conf.EditorString = f.editor
+	conf.Verbose = pipeline.VerboseTime
 	if f.Verbose() {
-		conf.Verbose = int(pipeline.VerboseTime)
+		conf.Verbose = pipeline.VerboseTrace
 	}
+
 	var err error
 	conf, err = conf.Parse()
 	if err != nil {
