@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/frizinak/binary v0.1.0
 	github.com/frizinak/gphoto2go v0.0.0-20200727103018-6698a73f379d
-	github.com/frizinak/phodo v0.2.3
+	github.com/frizinak/phodo v0.2.4
 	github.com/frizinak/version v0.1.1
 	github.com/go-gl/gl v0.0.0-20211210172815-726fda9656d6
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20221017161538-93cebf72946b
