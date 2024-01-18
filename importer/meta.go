@@ -2,6 +2,7 @@ package importer
 
 import (
 	"os"
+	"time"
 
 	"github.com/frizinak/photos/meta"
 	"github.com/frizinak/photos/tags"
@@ -11,7 +12,7 @@ func metaFile(f *File) string {
 	return f.Path() + ".meta"
 }
 
-func MakeMeta(f *File) (meta.Meta, error) {
+func MakeMeta(f *File, date time.Time) (meta.Meta, error) {
 	m, err := GetMeta(f)
 	if err != nil && !os.IsNotExist(err) {
 		return m, err
@@ -23,6 +24,7 @@ func MakeMeta(f *File) (meta.Meta, error) {
 		if err != nil {
 			return m, err
 		}
+
 	}
 
 	p := tags.ParseExif
@@ -30,11 +32,17 @@ func MakeMeta(f *File) (meta.Meta, error) {
 		p = tags.ParseFFProbe
 	}
 	tags, err := p(f.Path())
-
 	if err != nil {
 		return m, err
 	}
-	date := tags.Date()
+
+	if date == (time.Time{}) {
+		date = m.CreatedTime()
+		if m.Created == 0 {
+			date = tags.Date()
+		}
+	}
+
 	m.Created = date.Unix()
 
 	if ci, ok := tags.CameraInfo(); ok {
@@ -56,7 +64,7 @@ func EnsureMeta(f *File) (meta.Meta, error) {
 	m, err := GetMeta(f)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return MakeMeta(f)
+			return MakeMeta(f, time.Time{})
 		}
 	}
 	return m, err

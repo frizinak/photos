@@ -55,6 +55,7 @@ const (
 	GLocationDirectory = "glocation"
 	Verbose            = "v"
 	Editor             = "editor"
+	TimeOverride       = "force-time"
 )
 
 const (
@@ -122,6 +123,7 @@ var (
 		GLocationDirectory: {},
 		Verbose:            {},
 		Editor:             {},
+		TimeOverride:       {},
 	}
 
 	AllActions = map[string]struct{}{

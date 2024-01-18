@@ -122,7 +122,7 @@ func (i *Importer) syncMetaAndPP3(f *File) (bool, []string, error) {
 		if !os.IsNotExist(err) {
 			return false, nil, err
 		}
-		_, err := MakeMeta(f)
+		_, err := MakeMeta(f, time.Time{})
 		if err != nil {
 			return false, nil, err
 		}

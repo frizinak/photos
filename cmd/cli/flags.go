@@ -329,6 +329,9 @@ e.g.: photos -base . -0 -action show-jpegs -no-raw | xargs -0 feh`,
 	flags.Editor: {
 		help: "command to run when editing images using phodo",
 	},
+	flags.TimeOverride: {
+		help: "[import] force this date on all imported photos, ignoring exif date [Y-m-d (H:M)]",
+	},
 }
 
 type Flags struct {
@@ -377,6 +380,8 @@ type Flags struct {
 
 	phodoConf    *phodo.Conf
 	phodoDefault string
+
+	timeOverride time.Time
 
 	log    *log.Logger
 	output func(string)
@@ -459,6 +464,8 @@ func (f *Flags) PhodoConf() (phodo.Conf, error) {
 
 	return conf, nil
 }
+
+func (f *Flags) TimeOverride() time.Time { return f.timeOverride }
 
 func (f *Flags) GPhotosCredentials() string { return f.gphotos }
 func (f *Flags) GLocationDirectory() string { return f.glocation }
@@ -828,6 +835,7 @@ func (f *Flags) Parse() {
 	var noLocation bool
 	var photo bool
 	var video bool
+	var timeOverride string
 
 	f.fs.BoolVar(&help, "h", false, "\nhelp\n")
 	f.fs.Var(&actions, flags.Actions, f.lists.Help(flags.Actions))
@@ -880,6 +888,8 @@ func (f *Flags) Parse() {
 	f.fs.BoolVar(&verbose, flags.Verbose, false, f.lists.Help(flags.Verbose))
 
 	f.fs.StringVar(&editor, flags.Editor, "vim", f.lists.Help(flags.Editor))
+
+	f.fs.StringVar(&timeOverride, flags.TimeOverride, "", f.lists.Help(flags.TimeOverride))
 
 	uconfdir, err := os.UserConfigDir()
 	confArgs := make([]string, 0)
@@ -1089,6 +1099,12 @@ func (f *Flags) Parse() {
 	f.glocation = glocation
 	f.verbose = verbose
 	f.editor = editor
+
+	to, err := parseTime(timeOverride, false)
+	f.Err(err)
+	if to != nil {
+		f.timeOverride = *to
+	}
 
 	f.log = log.New(os.Stderr, "", log.LstdFlags)
 	if !verbose {

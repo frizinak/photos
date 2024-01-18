@@ -287,7 +287,7 @@ func main() {
 				importer.Register(n, gp)
 			}
 
-			flag.Exit(imp.Import(flag.Checksum(), progress))
+			flag.Exit(imp.Import(flag.Checksum(), progress, flag.TimeOverride()))
 			progressDone()
 		},
 		flags.ActionShow: func() {
@@ -494,7 +494,7 @@ func main() {
 			l.Println("rewriting meta")
 			work(-1, func(f *importer.File) (workCB, error) {
 				return func() error {
-					_, err := importer.MakeMeta(f)
+					_, err := importer.MakeMeta(f, flag.TimeOverride())
 					return err
 				}, nil
 			})
