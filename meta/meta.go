@@ -15,7 +15,8 @@ import (
 )
 
 var (
-	metaVersion    = []byte{'M', 0}
+	metaVersion0   = []byte{'M', 0}
+	metaVersion    = []byte{'M', 1}
 	oldJSONVersion = []byte{'{', '"'}
 )
 
@@ -107,11 +108,12 @@ func (c Converted) encode(w *binary.Writer) {
 }
 
 type Meta struct {
-	Checksum     string
-	Size         int64
-	RealFilename string
-	BaseFilename string
-	Created      int64
+	Checksum        string
+	Size            int64
+	RealFilename    string
+	BaseFilename    string
+	Created         int64
+	CreatedOverride bool
 
 	Deleted bool
 	Rating  uint8
@@ -124,7 +126,7 @@ type Meta struct {
 	CameraInfo *tags.CameraInfo
 }
 
-func (m Meta) decode(r *binary.Reader) Meta {
+func (m Meta) decode0(r *binary.Reader) Meta {
 	m.Checksum = r.ReadString(16)
 	m.Size = int64(r.ReadUint32())
 	m.RealFilename = r.ReadString(16)
@@ -150,6 +152,12 @@ func (m Meta) decode(r *binary.Reader) Meta {
 		m.CameraInfo = &cam
 	}
 
+	return m
+}
+
+func (m Meta) decode(r *binary.Reader) Meta {
+	m = m.decode0(r)
+	m.CreatedOverride = r.ReadUint8() == 1
 	return m
 }
 
@@ -201,6 +209,12 @@ func (m Meta) encode(w *binary.Writer) {
 		w.WriteUint8(1)
 		m.CameraInfo.BinaryEncode(w)
 	}()
+
+	var d uint8
+	if m.CreatedOverride {
+		d = 1
+	}
+	w.WriteUint8(d)
 }
 
 func New(size int64, real string, base string) Meta {
@@ -245,12 +259,20 @@ func Load(path string) (Meta, error) {
 		return loadOld(buf)
 	}
 
-	if !bytes.Equal(version, metaVersion) {
+	var decoder func(r *binary.Reader) Meta
+	if bytes.Equal(version, metaVersion) {
+		decoder = m.decode
+	}
+	if bytes.Equal(version, metaVersion0) {
+		decoder = m.decode0
+	}
+
+	if decoder == nil {
 		return m, fmt.Errorf("meta version mismatch: %+v != expected %+v in '%s'", version, metaVersion, path)
 	}
 
 	r := binary.NewReader(buf)
-	m = m.decode(r)
+	m = decoder(r)
 
 	if err = r.Err(); err != nil {
 		err = fmt.Errorf("could not load meta %s: %w", path, err)

@@ -31,7 +31,13 @@ type sidecar interface {
 	Edited() bool
 }
 
-func (i *Importer) convertPP3(input, output string, pp PP3, size int, created time.Time, lat, lng *float64) error {
+type info struct {
+	created         time.Time
+	createdOverride bool
+	lat, lng        *float64
+}
+
+func (i *Importer) convertPP3(input, output string, pp PP3, size int, info info) error {
 	pp.ResizeLongest(size)
 
 	pp3TempPath := fmt.Sprintf("%s.tmp.pp3", output)
@@ -65,7 +71,7 @@ func (i *Importer) convertPP3(input, output string, pp PP3, size int, created ti
 	}
 
 	err = i.jpegRewrite(tmp, func(e *exif.Exif) (bool, error) {
-		return i.Exif(e, created, lat, lng)
+		return i.Exif(e, info)
 	})
 
 	if err != nil {
@@ -80,7 +86,7 @@ func (i *Importer) convertPP3(input, output string, pp PP3, size int, created ti
 	return nil
 }
 
-func (i *Importer) convertPho(input, output string, pho Pho, size int, created time.Time, lat, lng *float64) error {
+func (i *Importer) convertPho(input, output string, pho Pho, size int, info info) error {
 	p, ok := pho.Convert()
 	if !ok {
 		return fmt.Errorf("no .convert pipeline in '%s'", pho.Path())
@@ -96,7 +102,7 @@ func (i *Importer) convertPho(input, output string, pho Pho, size int, created t
 		Add(element.LoadFile(input)).
 		Add(p.Element).
 		Add(pipeline.ElementFunc(func(ctx pipeline.Context, img *img48.Img) (*img48.Img, error) {
-			_, err := i.Exif(img.Exif, created, lat, lng)
+			_, err := i.Exif(img.Exif, info)
 			return img, err
 		})).
 		Add(element.Resize(size, size, "", core.ResizeMax|core.ResizeNoUpscale)).
@@ -107,24 +113,55 @@ func (i *Importer) convertPho(input, output string, pho Pho, size int, created t
 	return err
 }
 
-func (i *Importer) Exif(e *exif.Exif, created time.Time, lat, lng *float64) (bool, error) {
+func (i *Importer) Exif(e *exif.Exif, info info) (bool, error) {
 	write := false
 
-	w, err := i.ExifTZ(e, created)
+	w, err := i.ExifTZ(e, info.created, info.createdOverride)
 	write = write || w
 	if err != nil {
 		return write, err
 	}
 
-	if lat != nil && lng != nil {
-		w, err = i.ExifGPS(e, created, *lat, *lng)
+	if info.lat != nil && info.lng != nil {
+		w, err = i.ExifGPS(e, info.created, *info.lat, *info.lng)
 		write = write || w
 	}
 
 	return write, err
 }
 
-func (i *Importer) ExifTZ(e *exif.Exif, created time.Time) (bool, error) {
+func (i *Importer) ExifTZ(e *exif.Exif, created time.Time, createdOverride bool) (bool, error) {
+	offsetString := func(min float64) string {
+		sgn := "+"
+		if min < 0 {
+			sgn = "-"
+			min = -min
+		}
+		h := int(min / 60)
+		m := int(min - float64(h*60))
+		return fmt.Sprintf("%s%02d:%02d", sgn, h, m)
+	}
+
+	if createdOverride {
+		_, off := created.Zone()
+		v := offsetString(float64(off) / 60)
+		t := created.Format("2006:01:02 15:04:05")
+
+		e.Ensure(0, 0x8769, exif.TypeUint32).IFDSet.
+			Ensure(0, 0x9011, exif.TypeASCII).
+			SetString(v)
+		e.Ensure(0, 0x8769, exif.TypeUint32).IFDSet.
+			Ensure(0, 0x9010, exif.TypeASCII).
+			SetString(v)
+
+		e.Ensure(0, 0x8769, exif.TypeUint32).IFDSet.
+			Ensure(0, 0x9003, exif.TypeASCII).
+			SetString(t)
+		e.Ensure(0, 0x0132, exif.TypeASCII).SetString(t)
+
+		return true, nil
+	}
+
 	write := false
 	tzParse := func(dt string) (string, error) {
 		tm, err := time.Parse("2006:01:02 15:04:05", dt)
@@ -137,15 +174,7 @@ func (i *Importer) ExifTZ(e *exif.Exif, created time.Time) (bool, error) {
 			return "", errors.New("impossible timezone correction")
 		}
 
-		min := s.Minutes()
-		sgn := "+"
-		if min < 0 {
-			sgn = "-"
-			min = -min
-		}
-		h := int(min / 60)
-		m := int(min - float64(h*60))
-		return fmt.Sprintf("%s%02d:%02d", sgn, h, m), nil
+		return offsetString(s.Minutes()), nil
 	}
 
 	tzFix := func(dt []uint16, set func(value string)) error {
@@ -289,7 +318,7 @@ func (i *Importer) JPEGGPS(file string, created time.Time, lat, lng float64) err
 
 func (i *Importer) JPEGTZ(file string, t time.Time) error {
 	return i.jpegRewrite(file, func(e *exif.Exif) (bool, error) {
-		return i.ExifTZ(e, t)
+		return i.ExifTZ(e, t, true)
 	})
 }
 
@@ -302,6 +331,7 @@ func (i *Importer) convertIfUpdated(
 	converted map[string]meta.Converted,
 	size int,
 	created time.Time,
+	createdOverride bool,
 	checkOnly bool,
 ) (bool, string, error) {
 	h := crc64.New(crc64.MakeTable(crc64.ISO))
@@ -337,11 +367,18 @@ func (i *Importer) convertIfUpdated(
 		lat, lng = &loc.Lat, &loc.Lng
 	}
 
+	info := info{
+		created:         created,
+		createdOverride: createdOverride,
+		lat:             lat,
+		lng:             lng,
+	}
+
 	switch sc := sidecar.(type) {
 	case PP3:
-		return true, rel, i.convertPP3(link, output, sc, size, created, lat, lng)
+		return true, rel, i.convertPP3(link, output, sc, size, info)
 	case Pho:
-		return true, rel, i.convertPho(link, output, sc, size, created, lat, lng)
+		return true, rel, i.convertPho(link, output, sc, size, info)
 	}
 	return false, rel, fmt.Errorf("unsupported sidecar file of type %T", sidecar)
 }
@@ -455,6 +492,7 @@ func (i *Importer) fileConvert(f *File, sizes []int, checkOnly bool) (bool, erro
 				conv,
 				s,
 				m.CreatedTime(),
+				m.CreatedOverride,
 				checkOnly,
 			)
 			changed = changed || conv

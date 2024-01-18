@@ -115,7 +115,7 @@ func (rt *RTPreviewGen) Make(i *Importer, f *File, output string) error {
 	if err != nil {
 		return err
 	}
-	if err := i.convertPP3(f.Path(), tmp, pp, 1920, time.Time{}, nil, nil); err != nil {
+	if err := i.convertPP3(f.Path(), tmp, pp, 1920, info{created: time.Time{}}); err != nil {
 		return err
 	}
 

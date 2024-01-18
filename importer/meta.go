@@ -36,20 +36,27 @@ func MakeMeta(f *File, date time.Time) (meta.Meta, error) {
 		return m, err
 	}
 
-	if date == (time.Time{}) {
-		date = m.CreatedTime()
-		if m.Created == 0 {
-			date = tags.Date()
-		}
-	}
-
-	m.Created = date.Unix()
+	m = metaTime(m, tags, date)
 
 	if ci, ok := tags.CameraInfo(); ok {
 		m.CameraInfo = &ci
 	}
 
 	return m, m.Save(metaFile(f))
+}
+
+func metaTime(m meta.Meta, tags *tags.Tags, date time.Time) meta.Meta {
+	if date != (time.Time{}) {
+		m.CreatedOverride = true
+		m.Created = date.Unix()
+	}
+
+	if m.CreatedOverride {
+		return m
+	}
+
+	m.Created = tags.Date().Unix()
+	return m
 }
 
 func GetMeta(f *File) (meta.Meta, error) {
