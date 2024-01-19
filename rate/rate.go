@@ -87,6 +87,7 @@ type Rater struct {
 	fullscreen    bool
 	zoom          bool
 	auto          bool
+	invert        bool
 	tagging       bool
 	editingList   []string
 	editingChoice []rune
@@ -561,6 +562,9 @@ func (r *Rater) onKeyMain(w *glfw.Window, key glfw.Key, scancode int, action glf
 		}
 		fmt.Printf("auto switching images %s\n", enabled)
 
+	case glfw.KeyI:
+		r.invert = !r.invert
+
 	case glfw.KeyD, glfw.KeyDelete:
 		upd.Deleted = 1
 		r.nextIfAuto()
@@ -667,6 +671,7 @@ func (r *Rater) usage() {
 q            : quit
 f            : toggle fullscreen
 z            : toggle zoom
+i            : invert image
 
 a            : toggle automatically go to next image after deleting or rating
 e            : edit the current image with phodo
@@ -822,10 +827,12 @@ func (r *Rater) Run() error {
 
 	lastProjection := mgl32.Ident4()
 	lastI := -1
+	invert := r.invert
 	var lastTex uint32 = 0
 
 	modelUniform := gl.GetUniformLocation(program, gl.Str("model\x00"))
 	projectionUniform := gl.GetUniformLocation(program, gl.Str("projection\x00"))
+	invertUniform := gl.GetUniformLocation(program, gl.Str("invert\x00"))
 
 	var ebo uint32
 	indices := []uint32{0, 1, 3, 1, 2, 3}
@@ -906,8 +913,17 @@ func (r *Rater) Run() error {
 
 	update := func() error {
 		vao, dimension = getVAO(r.index)
-		if r.index == lastI {
+		if r.index == lastI && r.invert == invert {
 			return nil
+		}
+
+		if r.invert != invert {
+			var i int32
+			if r.invert {
+				i = 1
+			}
+			gl.Uniform1i(invertUniform, i)
+			invert = r.invert
 		}
 
 		lastI = r.index

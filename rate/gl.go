@@ -89,11 +89,14 @@ in vec3 FragPos;
 
 uniform sampler2D texture1;
 uniform mat4 projection;
+uniform int invert;
 
 void main()
 {
     color = texture(texture1, TexCoord);
-	if(color.a <= 0.02)
+	if (invert == 1)
+		color = vec4(1.0 - color.r, 1.0 - color.g, 1.0 - color.b, color.a);
+	if (color.a <= 0.02)
         discard;
 }`
 	vertexShader, err := compileShader(vertexShaderSrc, gl.VERTEX_SHADER)
