@@ -260,10 +260,10 @@ var lists = Lists{
 		help: "[any] until time filter [Y-m-d (H:M)]",
 	},
 	flags.Tags: {
-		help: `[any] tag filter, comma separated <or> can be specified multiple times <and>, ^ to negate a single tag
+		help: `[any] tag filter, can be specified multiple times
 e.g:
-photo must be tagged: (outside || sunny) && dog && !tree
--tags 'outside,sunny' -tags 'dog' -tags '^tree'
+photo must be tagged: (outside || westside || sunny) && dog && !tree
+-tags '*side,sunny' -tags 'dog' -tags '^tree'
 
 special case: '-' only matches files with no tags
 special case: '*' only matches files with tags`,
@@ -345,7 +345,7 @@ type Flags struct {
 	camera   []string
 	lens     []string
 	exposure []string
-	tags     []map[string]struct{}
+	tags     [][][]string
 	rating   struct {
 		gt, lt int
 	}
@@ -743,32 +743,27 @@ func (f *Flags) MetaFilter(imp *importer.Importer) MetaFilter {
 			}
 		}
 
-		tmap := m.Tags.Map()
 		for _, and := range f.tags {
 			match := false
-			if _, ok := and["-"]; ok {
-				match = len(m.Tags) == 0
-			}
-			if _, ok := and["*"]; ok {
-				if len(m.Tags) != 0 {
+			for _, _filter := range and {
+				filter := _filter
+				not := false
+				if len(filter) == 1 && filter[0] == "-" && len(m.Tags) == 0 {
 					match = true
 				}
-			}
-
-			for not := range and {
-				if !strings.HasPrefix(not, "^") {
-					continue
-				}
-				match = true
-				if _, ok := tmap[not[1:]]; ok {
-					match = false
-				}
-			}
-
-			for _, t := range m.Tags {
-				if _, ok := and[t]; ok {
+				if len(filter[0]) > 1 && filter[0][0] == '^' {
+					filter = make([]string, len(filter))
+					copy(filter, _filter)
+					filter[0] = filter[0][1:]
+					not = true
 					match = true
-					break
+				}
+
+				for _, tag := range m.Tags {
+					if filterString(tag, filter) {
+						match = !not
+						break
+					}
 				}
 			}
 
@@ -1037,17 +1032,18 @@ func (f *Flags) Parse() {
 		f.Err(err)
 	}
 
-	f.tags = make([]map[string]struct{}, 0, len(tags))
+	f.tags = make([][][]string, 0, len(tags))
 	for _, t := range tags {
 		_ors := strings.Split(t, ",")
-		ors := make(map[string]struct{}, len(_ors))
+		ors := make([][]string, 0, len(_ors))
 		for _, ot := range _ors {
 			ot = strings.TrimSpace(ot)
 			if ot == "" {
 				continue
 			}
-			ors[ot] = struct{}{}
+			ors = append(ors, strings.Split(ot, "*"))
 		}
+
 		if len(ors) != 0 {
 			f.tags = append(f.tags, ors)
 		}
