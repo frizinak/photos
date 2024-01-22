@@ -9,7 +9,9 @@ import (
 	"image"
 	"image/draw"
 	_ "image/jpeg"
+	"io"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -89,6 +91,7 @@ type Rater struct {
 	auto          bool
 	invert        bool
 	tagging       bool
+	preview       bool
 	editingList   []string
 	editingChoice []rune
 	editor        func(file string) error
@@ -591,6 +594,9 @@ func (r *Rater) onKeyMain(w *glfw.Window, key glfw.Key, scancode int, action glf
 
 	case glfw.KeyP:
 		doprint = true
+
+	case glfw.KeyO:
+		r.preview = !r.preview
 	}
 
 	doprint = doprint || li != r.index
@@ -672,6 +678,7 @@ q            : quit
 f            : toggle fullscreen
 z            : toggle zoom
 i            : invert image
+o            : toggle between preview and converted image
 
 a            : toggle automatically go to next image after deleting or rating
 e            : edit the current image with phodo
@@ -786,7 +793,7 @@ func (r *Rater) Run() error {
 	r.videoMode = r.monitor.GetVideoMode()
 	r.windowX, r.windowY = r.window.GetPos()
 	r.windowW, r.windowH = r.window.GetSize()
-	r.zoom = false
+	r.zoom = true
 	r.invalidateVAOs = false
 	r.fullscreen = false
 	r.proj = mgl32.Ortho2D(0, 800, 800, 0)
@@ -828,6 +835,7 @@ func (r *Rater) Run() error {
 	lastProjection := mgl32.Ident4()
 	lastI := -1
 	invert := r.invert
+	preview := r.preview
 	var lastTex uint32 = 0
 
 	modelUniform := gl.GetUniformLocation(program, gl.Str("model\x00"))
@@ -911,9 +919,38 @@ func (r *Rater) Run() error {
 		return vaos[index], dims
 	}
 
+	getImage := func(preview bool) (f io.ReadCloser, err error) {
+		if !preview {
+			rf := r.file()
+			if m, e := importer.GetMeta(rf); e == nil {
+				var closest string
+				var diff int = math.MaxInt
+				for k, c := range m.Conv {
+					d := 3840 - c.Size
+					if d < 0 {
+						d = -d
+					}
+					if d < diff {
+						diff = d
+						closest = k
+					}
+				}
+
+				if closest != "" {
+					f, err = os.Open(filepath.Join(r.compl.imp.ConvDir(), closest))
+					if err == nil {
+						return
+					}
+				}
+			}
+		}
+
+		return importer.GetPreview(r.file())
+	}
+
 	update := func() error {
 		vao, dimension = getVAO(r.index)
-		if r.index == lastI && r.invert == invert {
+		if r.index == lastI && r.invert == invert && r.preview == preview {
 			return nil
 		}
 
@@ -926,13 +963,27 @@ func (r *Rater) Run() error {
 			invert = r.invert
 		}
 
+		if r.preview != preview {
+			preview = r.preview
+			for i := range textures {
+				vaos[i] = 0
+				vbos[i] = 0
+
+				if textures[i] == 0 {
+					continue
+				}
+
+				textures[i] = 0
+			}
+		}
+
 		lastI = r.index
 		if textures[r.index] != 0 {
 			tex = textures[r.index]
 			return nil
 		}
 
-		f, err := importer.GetPreview(r.file())
+		f, err := getImage(r.preview)
 		if err != nil {
 			log.Printf("WARN could not get preview for %s: %s", r.file().Path(), err)
 			tex = 0
@@ -948,17 +999,14 @@ func (r *Rater) Run() error {
 		imgRGBA := image.NewRGBA(bounds)
 		draw.Draw(imgRGBA, bounds, img, image.Point{}, draw.Src)
 		newEntry(r.index, bounds)
-		stex, err := imgTexture(imgRGBA)
-
+		r.invalidateVAOs = true
+		stex := imgTexture(imgRGBA)
 		tex = stex + 1
 		vao, dimension = getVAO(r.index)
 
-		if err != nil {
-			return err
-		}
 		textures[r.index] = tex
 
-		for i := 0; i < len(textures); i++ {
+		for i := range textures {
 			if textures[i] == 0 {
 				continue
 			}

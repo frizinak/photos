@@ -11,10 +11,15 @@ import (
 	"github.com/go-gl/gl/v4.6-core/gl"
 )
 
-func imgTexture(img *image.RGBA) (uint32, error) {
-	b := img.Bounds()
+func imgTexture(img *image.RGBA) uint32 {
 	var texture uint32
 	gl.GenTextures(1, &texture)
+	imgTextureSet(texture, img)
+	return texture
+}
+
+func imgTextureSet(texture uint32, img *image.RGBA) {
+	b := img.Bounds()
 	gl.BindTexture(gl.TEXTURE_2D, texture)
 	const m = gl.NEAREST
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, m)
@@ -32,8 +37,6 @@ func imgTexture(img *image.RGBA) (uint32, error) {
 		gl.UNSIGNED_BYTE,
 		gl.Ptr(img.Pix),
 	)
-
-	return texture, nil
 }
 
 func releaseTexture(tex uint32) error {

@@ -97,6 +97,8 @@ func (i *Importer) ImageExtList(n []string) []string { return ImageExtList(n) }
 func (i *Importer) VideoExtList(n []string) []string { return VideoExtList(n) }
 func (i *Importer) RawExtList(n []string) []string   { return RawExtList(n) }
 
+func (i *Importer) ConvDir() string { return i.convDir }
+
 func (i *Importer) Import(checksum bool, progress Progress, timeOverride time.Time) error {
 	os.MkdirAll(i.rawDir, 0755)
 
