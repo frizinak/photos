@@ -101,7 +101,7 @@ type Rater struct {
 
 	index int
 
-	invalidateVAOs bool
+	invalidateVAOs []bool
 
 	proj mgl32.Mat4
 
@@ -530,6 +530,9 @@ func (r *Rater) onKeyMain(w *glfw.Window, key glfw.Key, scancode int, action glf
 		r.toggleFS()
 	case glfw.KeyZ:
 		r.zoom = !r.zoom
+		for i := range r.invalidateVAOs {
+			r.invalidateVAOs[i] = true
+		}
 	case glfw.KeyLeft, glfw.KeyLeftBracket:
 		r.addIndex(-1)
 	case glfw.KeyRight, glfw.KeyRightBracket, glfw.KeySpace:
@@ -647,7 +650,9 @@ func (r *Rater) setIndex(i int) {
 
 func (r *Rater) onResize(wnd *glfw.Window, width, height int) {
 	r.realWidth, r.realHeight = width, height
-	r.invalidateVAOs = true
+	for i := range r.invalidateVAOs {
+		r.invalidateVAOs[i] = true
+	}
 	gl.Viewport(0, 0, int32(width), int32(height))
 	r.proj = mgl32.Ortho2D(0, float32(width), float32(height), 0)
 	if r.fullscreen {
@@ -655,6 +660,7 @@ func (r *Rater) onResize(wnd *glfw.Window, width, height int) {
 	}
 	r.windowW, r.windowH = width, height
 }
+
 func (r *Rater) onPos(wnd *glfw.Window, x, y int) {
 	if r.fullscreen {
 		return
@@ -794,7 +800,7 @@ func (r *Rater) Run() error {
 	r.windowX, r.windowY = r.window.GetPos()
 	r.windowW, r.windowH = r.window.GetSize()
 	r.zoom = true
-	r.invalidateVAOs = false
+	r.invalidateVAOs = make([]bool, len(r.files))
 	r.fullscreen = false
 	r.proj = mgl32.Ortho2D(0, 800, 800, 0)
 	r.index = 0
@@ -824,7 +830,6 @@ func (r *Rater) Run() error {
 	textures := make([]uint32, len(r.files))
 	vaos := make([]uint32, len(r.files))
 	vbos := make([]uint32, len(r.files))
-	vaosState := make([]bool, len(r.files))
 	dimensions := make([]image.Point, len(r.files))
 	maxTex := 100
 	var tex uint32 = 0
@@ -880,7 +885,6 @@ func (r *Rater) Run() error {
 	}
 
 	getVAO := func(index int) (uint32, image.Point) {
-		s := vaosState[index]
 		dims := dimensions[index]
 		if r.zoom {
 			if dims.X == 0 || dims.Y == 0 {
@@ -893,26 +897,24 @@ func (r *Rater) Run() error {
 			}
 		}
 
-		if !r.invalidateVAOs && s == r.zoom {
+		if !r.invalidateVAOs[index] {
 			return vaos[index], dims
 		}
 		if vbos[index] == 0 {
 			return vaos[index], dims
 		}
 
-		r.invalidateVAOs = false
+		r.invalidateVAOs[index] = false
 		gl.BindBuffer(gl.ARRAY_BUFFER, vbos[index]-1)
 
 		d := points{}
 		if !r.zoom {
-			vaosState[index] = false
 			buf(&d, 0, 0, float32(dims.X), float32(dims.Y))
 			gl.BufferData(gl.ARRAY_BUFFER, stride*vertices*fs, gl.Ptr(&d[0]), gl.DYNAMIC_DRAW)
 			gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 			return vaos[index], dims
 		}
 
-		vaosState[index] = true
 		buf(&d, 0, 0, float32(dims.X), float32(dims.Y))
 		gl.BufferData(gl.ARRAY_BUFFER, stride*vertices*fs, gl.Ptr(&d[0]), gl.DYNAMIC_DRAW)
 		gl.BindBuffer(gl.ARRAY_BUFFER, 0)
@@ -999,7 +1001,7 @@ func (r *Rater) Run() error {
 		imgRGBA := image.NewRGBA(bounds)
 		draw.Draw(imgRGBA, bounds, img, image.Point{}, draw.Src)
 		newEntry(r.index, bounds)
-		r.invalidateVAOs = true
+		r.invalidateVAOs[r.index] = true
 		stex := imgTexture(imgRGBA)
 		tex = stex + 1
 		vao, dimension = getVAO(r.index)
