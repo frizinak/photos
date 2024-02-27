@@ -610,6 +610,35 @@ func (f *Flags) MetaFilter(imp *importer.Importer) MetaFilter {
 			return false
 		}
 
+		for _, and := range f.tags {
+			match := false
+			for _, _filter := range and {
+				filter := _filter
+				not := false
+				if len(filter) == 1 && filter[0] == "-" && len(m.Tags) == 0 {
+					match = true
+				}
+				if len(filter[0]) > 1 && filter[0][0] == '^' {
+					filter = make([]string, len(filter))
+					copy(filter, _filter)
+					filter[0] = filter[0][1:]
+					not = true
+					match = true
+				}
+
+				for _, tag := range m.Tags {
+					if filterString(tag, filter) {
+						match = !not
+						break
+					}
+				}
+			}
+
+			if !match {
+				return false
+			}
+		}
+
 		for _, f := range f.mfilterFuncs {
 			if !f.MetaFilter(m, fl) {
 				return false
@@ -740,35 +769,6 @@ func (f *Flags) MetaFilter(imp *importer.Importer) MetaFilter {
 					f.Err(fmt.Errorf("invalid exposure rule: '%s'", rule))
 				}
 
-			}
-		}
-
-		for _, and := range f.tags {
-			match := false
-			for _, _filter := range and {
-				filter := _filter
-				not := false
-				if len(filter) == 1 && filter[0] == "-" && len(m.Tags) == 0 {
-					match = true
-				}
-				if len(filter[0]) > 1 && filter[0][0] == '^' {
-					filter = make([]string, len(filter))
-					copy(filter, _filter)
-					filter[0] = filter[0][1:]
-					not = true
-					match = true
-				}
-
-				for _, tag := range m.Tags {
-					if filterString(tag, filter) {
-						match = !not
-						break
-					}
-				}
-			}
-
-			if !match {
-				return false
 			}
 		}
 
