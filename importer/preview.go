@@ -73,7 +73,7 @@ func (pho *PhoPreviewGen) Make(i *Importer, f *File, output string) error {
 		return err
 	}
 
-	root, err := phodo.LoadScript(conf, pho.PreviewFile)
+	root, vars, err := phodo.LoadScript(conf, pho.PreviewFile)
 	if err != nil {
 		return err
 	}
@@ -85,7 +85,7 @@ func (pho *PhoPreviewGen) Make(i *Importer, f *File, output string) error {
 
 	tmp := output + ".tmp"
 	line := pipeline.New()
-	line.Add(element.LoadFile(f.Path()))
+	line.Add(element.LoadFile(f.Path(), vars["dcraw"]))
 	line.Add(p.Element)
 	line.Add(element.SaveFile(tmp, ".jpg", 75))
 	rctx := pipeline.NewContext(pipeline.VerboseNone, io.Discard, pipeline.ModeConvert, context.Background())

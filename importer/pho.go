@@ -11,6 +11,7 @@ const PhoConvertTarget = ".convert"
 
 type Pho struct {
 	path string
+	vars map[string]string
 	hash []byte
 	root *pipeline.Root
 }
@@ -33,6 +34,8 @@ func (p Pho) Convert() (pipeline.NamedElement, bool) {
 	return p.root.Get(PhoConvertTarget)
 }
 
+func (p Pho) Vars() map[string]string { return p.vars }
+
 func (p Pho) Path() string     { return p.path }
 func (p Pho) Hash(w io.Writer) { w.Write(p.hash) }
 
@@ -42,11 +45,12 @@ func (i *Importer) GetPho(link string) (Pho, error) {
 	if err != nil {
 		return pho, err
 	}
-	root, err := phodo.LoadSidecar(conf, link)
+	root, vars, err := phodo.LoadSidecar(conf, link)
 	if err != nil {
 		return pho, err
 	}
 
+	pho.vars = vars
 	pho.root = root
 	pho.path, err = phodo.SidecarPath(conf, link)
 	if err != nil {

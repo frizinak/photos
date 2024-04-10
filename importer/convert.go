@@ -91,6 +91,7 @@ func (i *Importer) convertPho(input, output string, pho Pho, size int, info info
 	if !ok {
 		return fmt.Errorf("no .convert pipeline in '%s'", pho.Path())
 	}
+	vars := pho.Vars()
 
 	conf, err := i.phodoConf()
 	if err != nil {
@@ -99,7 +100,7 @@ func (i *Importer) convertPho(input, output string, pho Pho, size int, info info
 
 	// TODO perhaps pass size variable
 	line := pipeline.New().
-		Add(element.LoadFile(input)).
+		Add(element.LoadFile(input, vars["dcraw"])).
 		Add(p.Element).
 		Add(pipeline.ElementFunc(func(ctx pipeline.Context, img *img48.Img) (*img48.Img, error) {
 			_, err := i.Exif(img.Exif, info)
