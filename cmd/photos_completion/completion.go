@@ -84,6 +84,8 @@ func main() {
 		fl = ""
 	case flags.Video:
 		fl = ""
+	case flags.ImportJPEG:
+		fl = ""
 	}
 
 	if fl == "" {
