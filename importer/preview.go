@@ -83,9 +83,20 @@ func (pho *PhoPreviewGen) Make(i *Importer, f *File, output string) error {
 		return errors.New("no .main pipeline found in preview phodo definition")
 	}
 
+	dcrawk := "dcraw"
+	{
+		dcrawk_list := []string{"dcraw_preview", "dcraw_previews", "dcraw_edit"}
+		for _, k := range dcrawk_list {
+			if _, ok := vars[k]; ok {
+				dcrawk = k
+				break
+			}
+		}
+	}
+
 	tmp := output + ".tmp"
 	line := pipeline.New()
-	line.Add(element.LoadFile(f.Path(), vars["dcraw"]))
+	line.Add(element.LoadFile(f.Path(), vars[dcrawk]))
 	line.Add(p.Element)
 	line.Add(element.SaveFile(tmp, ".jpg", 75))
 	rctx := pipeline.NewContext(pipeline.VerboseNone, io.Discard, pipeline.ModeConvert, context.Background())
