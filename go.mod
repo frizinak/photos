@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/frizinak/binary v0.1.0
 	github.com/frizinak/gphoto2go v0.0.0-20200727103018-6698a73f379d
-	github.com/frizinak/phodo v0.2.5-0.20240411071941-551cd0b6908d
+	github.com/frizinak/phodo v0.2.5-0.20240522101023-a450dc2c97f3
 	github.com/frizinak/version v0.1.1
 	github.com/go-gl/gl v0.0.0-20211210172815-726fda9656d6
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20221017161538-93cebf72946b
@@ -17,9 +17,7 @@ require (
 )
 
 require (
-	github.com/Andeling/tiff v0.0.0-20200203003012-f6e011e4b554 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
-	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/mattn/anko v0.1.9 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect

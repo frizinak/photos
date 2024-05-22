@@ -1,5 +1,3 @@
-github.com/Andeling/tiff v0.0.0-20200203003012-f6e011e4b554 h1:0VZXvoJfVIy5bhBJi+rzuZoGldEiTzJKEwd/DfcQjn0=
-github.com/Andeling/tiff v0.0.0-20200203003012-f6e011e4b554/go.mod h1:6gTTE2pNYZRjtVNwx6EqxCeOP87CHTcNWkBVOSeEBVw=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -7,18 +5,8 @@ github.com/frizinak/binary v0.1.0 h1:JKqTBgHFzbRCYf7jjvwyKp95xeqt9RSi0l0rdxvSdu0
 github.com/frizinak/binary v0.1.0/go.mod h1:XLSAtIYW86xHUC90aSQBD0h6SSkh/p5JdKXUB+tXsEE=
 github.com/frizinak/gphoto2go v0.0.0-20200727103018-6698a73f379d h1:Fv+e/CJVxC0089QeeeanwpyXD48hkscDOzl/JqCUbdc=
 github.com/frizinak/gphoto2go v0.0.0-20200727103018-6698a73f379d/go.mod h1:JPIY4BwqouMp6+2BN5SU4l/42RtU3pavADGCQCxaGNU=
-github.com/frizinak/phodo v0.2.4 h1:dB0M/wKWH9VOD7hcVyFlpUdcfhrZCiRIUUCb3wBjIwI=
-github.com/frizinak/phodo v0.2.4/go.mod h1:kkZjTw3qfdwikOu6IhEgS46v3QMkhUNsaL9+OJvKn6c=
-github.com/frizinak/phodo v0.2.5-0.20240209140559-3d70d734f61c h1:tgiJXFcPgY+Zx1ENFFunCokDB9a9TqHeq/2afHgOiEU=
-github.com/frizinak/phodo v0.2.5-0.20240209140559-3d70d734f61c/go.mod h1:kkZjTw3qfdwikOu6IhEgS46v3QMkhUNsaL9+OJvKn6c=
-github.com/frizinak/phodo v0.2.5-0.20240402113816-3c9bb53d9768 h1:D0qUdI/FylHh6xrpNl9eKLfZLeZtNwzoe+GURg0+blg=
-github.com/frizinak/phodo v0.2.5-0.20240402113816-3c9bb53d9768/go.mod h1:kkZjTw3qfdwikOu6IhEgS46v3QMkhUNsaL9+OJvKn6c=
-github.com/frizinak/phodo v0.2.5-0.20240410094516-466207d7a05f h1:RW365YkW1yHaaaPRlGxO/jxjGXLFoFSdv0HRRILCAZA=
-github.com/frizinak/phodo v0.2.5-0.20240410094516-466207d7a05f/go.mod h1:kkZjTw3qfdwikOu6IhEgS46v3QMkhUNsaL9+OJvKn6c=
-github.com/frizinak/phodo v0.2.5-0.20240410102210-2cba1e38712e h1:fJH3MS1VMfVtC5iXqvqw6rzXgmVeWplpGvIVWeiJWQI=
-github.com/frizinak/phodo v0.2.5-0.20240410102210-2cba1e38712e/go.mod h1:kkZjTw3qfdwikOu6IhEgS46v3QMkhUNsaL9+OJvKn6c=
-github.com/frizinak/phodo v0.2.5-0.20240411071941-551cd0b6908d h1:3MYNnsDAzV3hqeVJfVLyKBp7o2GQ5XDx5a2cc502vrc=
-github.com/frizinak/phodo v0.2.5-0.20240411071941-551cd0b6908d/go.mod h1:kkZjTw3qfdwikOu6IhEgS46v3QMkhUNsaL9+OJvKn6c=
+github.com/frizinak/phodo v0.2.5-0.20240522101023-a450dc2c97f3 h1:CTOiqK0dIS5cnDHR/Od4bd+PJw7iajnppo4XrfZQZaI=
+github.com/frizinak/phodo v0.2.5-0.20240522101023-a450dc2c97f3/go.mod h1:kkZjTw3qfdwikOu6IhEgS46v3QMkhUNsaL9+OJvKn6c=
 github.com/frizinak/version v0.1.1 h1:fP/201u3sDI2+En01wK+9Ymtq7uLbROGDkDm2FEpFtE=
 github.com/frizinak/version v0.1.1/go.mod h1:6H3Ze6VCg1n8wP4wX1dyV3kYn6bLNbh3f2U5YuMbOvw=
 github.com/go-gl/gl v0.0.0-20211210172815-726fda9656d6 h1:zDw5v7qm4yH7N8C8uWd+8Ii9rROdgWxQuGoJ9WDXxfk=
@@ -32,9 +20,6 @@ github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 h1:El6M4kTTCOh6aBiKaU
 github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510/go.mod h1:pupxD2MaaD3pAXIBCelhxNneeOaAeabZDe5s4K6zSpQ=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
-github.com/klauspost/compress v1.9.8/go.mod h1:RyIbtBH6LamlWaDj8nUwkbUhJ87Yi3uG0guNDohfE1A=
-github.com/klauspost/compress v1.16.7 h1:2mk3MPGNzKyxErAw8YaohYh69+pa4sIQSC0fPGCFR9I=
-github.com/klauspost/compress v1.16.7/go.mod h1:ntbaceVETuRiXiv4DpjP66DpAtAGkEQskQzEyD//IeE=
 github.com/mattn/anko v0.1.9 h1:OpdRDvjOY/FQXoGXkN0n7b0br4a4fHB5hhsaq0Cd3ds=
 github.com/mattn/anko v0.1.9/go.mod h1:gjrudvzf1t7FWTZo1Nbywnr75g3uDnGjXdp2nkguBjQ=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
