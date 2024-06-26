@@ -5,8 +5,8 @@ github.com/frizinak/binary v0.1.0 h1:JKqTBgHFzbRCYf7jjvwyKp95xeqt9RSi0l0rdxvSdu0
 github.com/frizinak/binary v0.1.0/go.mod h1:XLSAtIYW86xHUC90aSQBD0h6SSkh/p5JdKXUB+tXsEE=
 github.com/frizinak/gphoto2go v0.0.0-20200727103018-6698a73f379d h1:Fv+e/CJVxC0089QeeeanwpyXD48hkscDOzl/JqCUbdc=
 github.com/frizinak/gphoto2go v0.0.0-20200727103018-6698a73f379d/go.mod h1:JPIY4BwqouMp6+2BN5SU4l/42RtU3pavADGCQCxaGNU=
-github.com/frizinak/phodo v0.2.5-0.20240522101023-a450dc2c97f3 h1:CTOiqK0dIS5cnDHR/Od4bd+PJw7iajnppo4XrfZQZaI=
-github.com/frizinak/phodo v0.2.5-0.20240522101023-a450dc2c97f3/go.mod h1:kkZjTw3qfdwikOu6IhEgS46v3QMkhUNsaL9+OJvKn6c=
+github.com/frizinak/phodo v0.2.5 h1:kclA1eOy+GBNcZ+SuYiBoXSK+3zWSHBhqjGk0+pUgZs=
+github.com/frizinak/phodo v0.2.5/go.mod h1:kkZjTw3qfdwikOu6IhEgS46v3QMkhUNsaL9+OJvKn6c=
 github.com/frizinak/version v0.1.1 h1:fP/201u3sDI2+En01wK+9Ymtq7uLbROGDkDm2FEpFtE=
 github.com/frizinak/version v0.1.1/go.mod h1:6H3Ze6VCg1n8wP4wX1dyV3kYn6bLNbh3f2U5YuMbOvw=
 github.com/go-gl/gl v0.0.0-20211210172815-726fda9656d6 h1:zDw5v7qm4yH7N8C8uWd+8Ii9rROdgWxQuGoJ9WDXxfk=
