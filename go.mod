@@ -1,18 +1,20 @@
 module github.com/frizinak/photos
 
-go 1.20
+go 1.21
+
+toolchain go1.24.2
 
 require (
 	github.com/frizinak/binary v0.1.0
 	github.com/frizinak/gphoto2go v0.0.0-20200727103018-6698a73f379d
-	github.com/frizinak/phodo v0.2.5
+	github.com/frizinak/phodo v0.2.6
 	github.com/frizinak/version v0.1.1
 	github.com/go-gl/gl v0.0.0-20211210172815-726fda9656d6
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20221017161538-93cebf72946b
 	github.com/go-gl/mathgl v1.0.0
 	github.com/json-iterator/go v1.1.12
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
-	golang.org/x/image v0.11.0
+	golang.org/x/image v0.23.0
 	gopkg.in/ini.v1 v1.66.4
 )
 
@@ -21,5 +23,5 @@ require (
 	github.com/mattn/anko v0.1.9 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	golang.org/x/text v0.12.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 )

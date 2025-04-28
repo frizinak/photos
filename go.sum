@@ -7,6 +7,8 @@ github.com/frizinak/gphoto2go v0.0.0-20200727103018-6698a73f379d h1:Fv+e/CJVxC00
 github.com/frizinak/gphoto2go v0.0.0-20200727103018-6698a73f379d/go.mod h1:JPIY4BwqouMp6+2BN5SU4l/42RtU3pavADGCQCxaGNU=
 github.com/frizinak/phodo v0.2.5 h1:kclA1eOy+GBNcZ+SuYiBoXSK+3zWSHBhqjGk0+pUgZs=
 github.com/frizinak/phodo v0.2.5/go.mod h1:kkZjTw3qfdwikOu6IhEgS46v3QMkhUNsaL9+OJvKn6c=
+github.com/frizinak/phodo v0.2.6 h1:YdbE/f27JmcmRQ6VQkBlNfni82e3JX9NBvAOPzAVr4Y=
+github.com/frizinak/phodo v0.2.6/go.mod h1:x1HuzlgOtoDjQcI+XhZX61N5ZIRmEs4gk1ZbkjYs9pg=
 github.com/frizinak/version v0.1.1 h1:fP/201u3sDI2+En01wK+9Ymtq7uLbROGDkDm2FEpFtE=
 github.com/frizinak/version v0.1.1/go.mod h1:6H3Ze6VCg1n8wP4wX1dyV3kYn6bLNbh3f2U5YuMbOvw=
 github.com/go-gl/gl v0.0.0-20211210172815-726fda9656d6 h1:zDw5v7qm4yH7N8C8uWd+8Ii9rROdgWxQuGoJ9WDXxfk=
@@ -40,6 +42,7 @@ golang.org/x/crypto v0.0.0-20210921155107-089bfa567519/go.mod h1:GvvjBRRGRdwPK5y
 golang.org/x/image v0.0.0-20190321063152-3fc05d484e9f/go.mod h1:kZ7UVZpmo3dzQBMxlp+ypCbDeSB+sBbTgSJuh5dn5js=
 golang.org/x/image v0.11.0 h1:ds2RoQvBvYTiJkwpSFDwCcDFNX7DqjL2WsUgTNk0Ooo=
 golang.org/x/image v0.11.0/go.mod h1:bglhjqbqVuEb9e9+eNR45Jfu7D+T4Qan+NhQk8Ck2P8=
+golang.org/x/image v0.23.0/go.mod h1:wJJBTdLfCCf3tiHa1fNxpZmUI4mmoZvwMCPP0ddoNKY=
 golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4/go.mod h1:jJ57K6gSWd91VN4djpZkiMVwK6gcyfeH4XE8wZrZaV4=
 golang.org/x/mod v0.8.0/go.mod h1:iBbtSCu2XBx23ZKBPSOrRkjjQPZFPuis4dIYUhu/chs=
 golang.org/x/net v0.0.0-20190620200207-3b0461eec859/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
@@ -64,6 +67,7 @@ golang.org/x/text v0.3.7/go.mod h1:u+2+/6zg+i71rQMx5EYifcz6MCKuco9NR6JIITiCfzQ=
 golang.org/x/text v0.7.0/go.mod h1:mrYo+phRRbMaCq/xk9113O4dZlRixOauAjOtrjsXDZ8=
 golang.org/x/text v0.12.0 h1:k+n5B8goJNdU7hSvEtMUz3d1Q6D/XW4COJSJR6fN0mc=
 golang.org/x/text v0.12.0/go.mod h1:TvPlkZtksWOMsz7fbANvkp4WM8x/WCo/om8BMLbz+aE=
+golang.org/x/text v0.21.0/go.mod h1:4IBbMaMmOPCJ8SecivzSH54+73PCFmPWxNTLm+vZkEQ=
 golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
 golang.org/x/tools v0.0.0-20191119224855-298f0cb1881e/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=
 golang.org/x/tools v0.1.12/go.mod h1:hNGJHUnrk76NpqgfD5Aqm5Crs+Hm0VOH/i9J2+nxYbc=
